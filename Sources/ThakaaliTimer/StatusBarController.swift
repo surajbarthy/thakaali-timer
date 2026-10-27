@@ -9,6 +9,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let settings: AppSettings
     private let openSettings: () -> Void
     private var cancellable: AnyCancellable?
+    /// Set while the menu is opened to ask what to do after a session ends.
+    private var pendingFinish: SessionKind?
+    private var lastFinished: SessionKind = .tomato
 
     init(engine: TimerEngine, settings: AppSettings, openSettings: @escaping () -> Void) {
         self.engine = engine
@@ -55,8 +58,24 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     // MARK: Menu
 
+    /// Drops the menu open from the menu bar item with start / extend / stop choices.
+    func presentFinishMenu(after kind: SessionKind) {
+        pendingFinish = kind
+        lastFinished = kind
+        item.button?.performClick(nil)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        pendingFinish = nil
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+
+        if let finished = pendingFinish {
+            buildFinishMenu(menu, finished: finished)
+            return
+        }
 
         let header = NSMenuItem(title: statusText(), action: nil, keyEquivalent: "")
         header.isEnabled = false
@@ -104,6 +123,26 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(makeItem("Quit Thakaali Timer", #selector(quit), key: "q"))
     }
 
+    private func buildFinishMenu(_ menu: NSMenu, finished: SessionKind) {
+        let header = NSMenuItem(title: finished == .tomato ? "Tomato done" : "\(finished.title) over", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        menu.addItem(.separator())
+
+        let next = engine.nextKind(after: finished)
+        menu.addItem(makeItem("Start \(next.title)", #selector(startNextAfterFinish)))
+        menu.addItem(makeItem("Extend 5 min", #selector(extendFive)))
+        let extendLong = makeItem("Extend 15 min", #selector(extendFifteen))
+        extendLong.isAlternate = true
+        extendLong.keyEquivalentModifierMask = .option
+        menu.addItem(extendLong)
+        menu.addItem(makeItem("Stop", #selector(stop)))
+
+        menu.addItem(.separator())
+        menu.addItem(makeItem("Settings…", #selector(showSettings), key: ","))
+        menu.addItem(makeItem("Quit Thakaali Timer", #selector(quit), key: "q"))
+    }
+
     private func statusText() -> String {
         let done = engine.completedTomatoes
         let tally = done == 1 ? "1 tomato done" : "\(done) tomatoes done"
@@ -121,6 +160,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func startTomato() { engine.startTomato() }
     @objc private func startBreak() { engine.startBreak() }
     @objc private func stop() { engine.stop() }
+    @objc private func startNextAfterFinish() { engine.start(engine.nextKind(after: lastFinished)) }
+    @objc private func extendFive() { engine.extend(lastFinished, minutes: 5) }
+    @objc private func extendFifteen() { engine.extend(lastFinished, minutes: 15) }
     @objc private func pause() { engine.pause() }
     @objc private func resume() { engine.resume() }
     @objc private func showSettings() { openSettings() }

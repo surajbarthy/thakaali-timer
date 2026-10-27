@@ -13,6 +13,13 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
+                Picker("Style", selection: $settings.lineStyle) {
+                    ForEach(LineStyle.allCases) { style in
+                        Text(style.label).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 HStack {
                     Slider(value: $settings.thickness, in: AppSettings.thicknessRange, step: 1) {
                         Text("Thickness")
@@ -22,7 +29,7 @@ struct SettingsView: View {
                         .frame(width: 44, alignment: .trailing)
                 }
 
-                Text("The line is shown on screen while this window is open, so you can try sizes out.")
+                Text("Thickness is the resting size. The line doubles when a session starts or when you rest the pointer on it. It's shown while this window is open so you can try options out.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -37,8 +44,8 @@ struct SettingsView: View {
             }
 
             Section("When a session ends") {
-                Picker("When a session ends", selection: $settings.endMode) {
-                    ForEach(EndMode.allCases) { mode in
+                Picker("When a session ends", selection: $settings.endStyle) {
+                    ForEach(EndStyle.allCases) { mode in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(mode.title)
                             Text(mode.detail)
@@ -53,7 +60,7 @@ struct SettingsView: View {
             }
 
             Section("Menu bar") {
-                Toggle("Show time remaining", isOn: $settings.showTimeInMenuBar)
+                Toggle("Show countdown in menu bar", isOn: $settings.showTimeInMenuBar)
                 Text("Hold ⌥ Option in the menu to pause instead of stop.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

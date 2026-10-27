@@ -10,22 +10,55 @@ enum LineEdge: String, CaseIterable, Identifiable {
     var isHorizontal: Bool { self == .top || self == .bottom }
 }
 
+/// How the line is drawn.
+enum LineStyle: String, CaseIterable, Identifiable {
+    case solid, feathered, haze
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+
+    /// How far the drawn band extends inward, as a multiple of the line thickness.
+    var spread: CGFloat {
+        switch self {
+        case .solid: return 1
+        case .feathered: return 3
+        case .haze: return 9
+        }
+    }
+
+    /// Opacity at the screen edge; the band fades to clear inward unless solid.
+    var edgeAlpha: CGFloat { self == .haze ? 0.75 : 1 }
+
+    /// Fade at the moving end: the shorter of a share of the screen and a share of the line.
+    var endFade: (screenShare: CGFloat, lineShare: CGFloat)? {
+        switch self {
+        case .solid: return nil
+        case .feathered: return (0.14, 0.4)
+        case .haze: return (0.22, 0.6)
+        }
+    }
+}
+
 /// What happens when a tomato or break runs out.
-enum EndMode: String, CaseIterable, Identifiable {
-    case ask, autostart
+enum EndStyle: String, CaseIterable, Identifiable {
+    case menu, toast, alert, autostart
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .ask: return "Ask what to do"
+        case .menu: return "Menu from the menu bar"
+        case .toast: return "Toast in the corner"
+        case .alert: return "Alert"
         case .autostart: return "Autostart next"
         }
     }
 
     var detail: String {
         switch self {
-        case .ask: return "An alert asks whether to start the next session or extend this one."
+        case .menu: return "The app's menu drops open with start, extend and stop."
+        case .toast: return "A small toast appears where the line ended."
+        case .alert: return "A centred alert interrupts you and asks what to do."
         case .autostart: return "The next session starts automatically."
         }
     }
@@ -36,48 +69,53 @@ enum EndMode: String, CaseIterable, Identifiable {
 final class AppSettings: ObservableObject {
     private enum Key {
         static let edge = "lineEdge"
-        static let thickness = "lineThickness"
+        static let thickness = "restingThickness"
+        static let lineStyle = "lineStyle"
         static let focusMinutes = "focusMinutes"
         static let shortBreakMinutes = "shortBreakMinutes"
         static let longBreakMinutes = "longBreakMinutes"
         static let longBreakEvery = "longBreakEvery"
-        static let endMode = "endMode"
-        static let showTimeInMenuBar = "showTimeInMenuBar"
+        static let endStyle = "endStyle"
+        static let showTimeInMenuBar = "showCountdownInMenuBar"
     }
 
-    static let thicknessRange: ClosedRange<Double> = 1...30
+    /// Resting thickness; the line grows to twice this when a session starts or you point at it.
+    static let thicknessRange: ClosedRange<Double> = 1...12
 
     private let defaults: UserDefaults
 
     @Published var edge: LineEdge { didSet { defaults.set(edge.rawValue, forKey: Key.edge) } }
     @Published var thickness: Double { didSet { defaults.set(thickness, forKey: Key.thickness) } }
+    @Published var lineStyle: LineStyle { didSet { defaults.set(lineStyle.rawValue, forKey: Key.lineStyle) } }
     @Published var focusMinutes: Int { didSet { defaults.set(focusMinutes, forKey: Key.focusMinutes) } }
     @Published var shortBreakMinutes: Int { didSet { defaults.set(shortBreakMinutes, forKey: Key.shortBreakMinutes) } }
     @Published var longBreakMinutes: Int { didSet { defaults.set(longBreakMinutes, forKey: Key.longBreakMinutes) } }
     @Published var longBreakEvery: Int { didSet { defaults.set(longBreakEvery, forKey: Key.longBreakEvery) } }
-    @Published var endMode: EndMode { didSet { defaults.set(endMode.rawValue, forKey: Key.endMode) } }
+    @Published var endStyle: EndStyle { didSet { defaults.set(endStyle.rawValue, forKey: Key.endStyle) } }
     @Published var showTimeInMenuBar: Bool { didSet { defaults.set(showTimeInMenuBar, forKey: Key.showTimeInMenuBar) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
             Key.edge: LineEdge.top.rawValue,
-            Key.thickness: 4.0,
+            Key.thickness: 3.0,
+            Key.lineStyle: LineStyle.solid.rawValue,
             Key.focusMinutes: 25,
             Key.shortBreakMinutes: 5,
             Key.longBreakMinutes: 15,
             Key.longBreakEvery: 4,
-            Key.endMode: EndMode.ask.rawValue,
-            Key.showTimeInMenuBar: true,
+            Key.endStyle: EndStyle.toast.rawValue,
+            Key.showTimeInMenuBar: false,
         ])
 
         edge = LineEdge(rawValue: defaults.string(forKey: Key.edge) ?? "") ?? .top
         thickness = defaults.double(forKey: Key.thickness)
+        lineStyle = LineStyle(rawValue: defaults.string(forKey: Key.lineStyle) ?? "") ?? .solid
         focusMinutes = defaults.integer(forKey: Key.focusMinutes)
         shortBreakMinutes = defaults.integer(forKey: Key.shortBreakMinutes)
         longBreakMinutes = defaults.integer(forKey: Key.longBreakMinutes)
         longBreakEvery = defaults.integer(forKey: Key.longBreakEvery)
-        endMode = EndMode(rawValue: defaults.string(forKey: Key.endMode) ?? "") ?? .ask
+        endStyle = EndStyle(rawValue: defaults.string(forKey: Key.endStyle) ?? "") ?? .toast
         showTimeInMenuBar = defaults.bool(forKey: Key.showTimeInMenuBar)
     }
 }

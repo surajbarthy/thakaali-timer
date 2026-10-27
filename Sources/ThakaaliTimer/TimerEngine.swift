@@ -43,6 +43,8 @@ final class TimerEngine: NSObject, ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var now = Date()
     @Published private(set) var completedTomatoes = 0
+    /// Bumped whenever a new session (not a resume) begins.
+    private(set) var startCount = 0
 
     /// Called after a session runs out, with the kind that just ended.
     var onSessionFinished: ((SessionKind) -> Void)?
@@ -67,18 +69,22 @@ final class TimerEngine: NSObject, ObservableObject {
         return false
     }
 
-    var remaining: TimeInterval {
+    var remaining: TimeInterval { remaining(at: now) }
+
+    func remaining(at date: Date) -> TimeInterval {
         switch state {
         case .idle: return 0
-        case .running(_, let endsAt): return max(0, endsAt.timeIntervalSince(now))
+        case .running(_, let endsAt): return max(0, endsAt.timeIntervalSince(date))
         case .paused(_, let remaining): return remaining
         }
     }
 
     /// 1 at the start of a session, 0 when it runs out.
-    var fractionRemaining: Double {
+    var fractionRemaining: Double { fractionRemaining(at: now) }
+
+    func fractionRemaining(at date: Date) -> Double {
         guard let session, session.total > 0 else { return 0 }
-        return min(1, max(0, remaining / session.total))
+        return min(1, max(0, remaining(at: date) / session.total))
     }
 
     /// The break that would start now: a long one after every Nth tomato.
@@ -133,6 +139,7 @@ final class TimerEngine: NSObject, ObservableObject {
     }
 
     private func begin(_ session: Session) {
+        startCount += 1
         now = Date()
         state = .running(session, endsAt: now.addingTimeInterval(session.total))
         startTicker()

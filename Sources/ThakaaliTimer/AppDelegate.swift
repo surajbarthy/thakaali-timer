@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -9,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var overlay: OverlayController?
     private var statusBar: StatusBarController?
     private var settingsWindow: NSWindow?
+    private let toast = ToastController()
+    private var stateWatch: AnyCancellable?
 
     static func main() {
         let app = NSApplication.shared
@@ -29,14 +32,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         engine.onSessionFinished = { [weak self] kind in
             self?.sessionFinished(kind)
         }
+        // However the next session gets started, a leftover toast goes away.
+        stateWatch = engine.$state
+            .filter { $0 != .idle }
+            .sink { [weak self] _ in self?.toast.dismiss() }
     }
 
     private func sessionFinished(_ kind: SessionKind) {
         NSSound(named: "Glass")?.play()
-        switch settings.endMode {
+        let next = engine.nextKind(after: kind)
+        switch settings.endStyle {
         case .autostart:
-            engine.start(engine.nextKind(after: kind))
-        case .ask:
+            engine.start(next)
+        case .toast:
+            toast.show(finished: kind, next: next, settings: settings, actions: .init(
+                startNext: { [weak self] in self?.engine.start(next) },
+                extend: { [weak self] minutes in self?.engine.extend(kind, minutes: minutes) },
+                stop: {}
+            ))
+        case .menu:
+            // Leave the timer callback before opening the menu's tracking loop.
+            Task { @MainActor [weak self] in
+                self?.statusBar?.presentFinishMenu(after: kind)
+            }
+        case .alert:
             // Leave the timer callback before running a modal alert.
             Task { @MainActor [weak self] in
                 self?.askWhatNext(after: kind)

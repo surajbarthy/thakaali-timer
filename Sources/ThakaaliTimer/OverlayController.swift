@@ -2,15 +2,31 @@ import AppKit
 import Combine
 
 /// Draws the progress line along one edge of every display.
+///
+/// The tomato line is anchored at the top-right (bottom on the side edges) and drains toward
+/// that corner; the break line grows back out of the same corner until it is full.
 @MainActor
 final class OverlayController: NSObject {
+    /// How close the pointer must be to the line, and for how long, before it counts as hovering.
+    static let hoverMargin: CGFloat = 6
+    static let hoverDelay: TimeInterval = 0.25
+    /// How long the line stays thick after a session starts.
+    static let startBoost: TimeInterval = 2.5
+    static let frameInterval: TimeInterval = 1.0 / 30
+
     private let engine: TimerEngine
     private let settings: AppSettings
     private var windows: [LineWindow] = []
+    private let hoverLabel = HoverLabelWindow()
     private var cancellable: AnyCancellable?
-    private var lastGeometry: (LineEdge, Double)?
+    private var frameTimer: Timer?
+    private var lastFrame = Date()
+    private var displayedThickness: CGFloat?
+    private var lastStartCount = 0
+    private var boostUntil = Date.distantPast
+    private var nearSince: Date?
 
-    /// Shows a full line while idle, so thickness and position changes can be seen in Settings.
+    /// Shows a full line while idle, so style, thickness and position changes can be seen in Settings.
     var previewing = false {
         didSet { refresh() }
     }
@@ -42,54 +58,129 @@ final class OverlayController: NSObject {
     private func rebuildWindows() {
         windows.forEach { $0.close() }
         windows = NSScreen.screens.map { LineWindow(screen: $0) }
-        lastGeometry = nil
         refresh()
     }
 
     func refresh() {
-        let session = engine.session
-        let visible = session != nil || previewing
-        guard visible else {
-            windows.forEach { $0.orderOut(nil) }
-            lastGeometry = nil
-            return
+        if engine.startCount != lastStartCount {
+            lastStartCount = engine.startCount
+            boostUntil = Date().addingTimeInterval(Self.startBoost)
         }
 
-        let edge = settings.edge
-        let thickness = settings.thickness
-        let geometryChanged = lastGeometry.map { $0.0 != edge || $0.1 != thickness } ?? true
-        lastGeometry = (edge, thickness)
+        if engine.session != nil || previewing {
+            startFrameTimer()
+            renderFrame()
+        } else {
+            stopFrameTimer()
+            windows.forEach { $0.orderOut(nil) }
+            hoverLabel.orderOut(nil)
+            nearSince = nil
+            displayedThickness = nil
+        }
+    }
 
+    private func startFrameTimer() {
+        guard frameTimer == nil else { return }
+        lastFrame = Date()
+        let timer = Timer(timeInterval: Self.frameInterval, target: self, selector: #selector(frameTick), userInfo: nil, repeats: true)
+        // Common modes keep the line moving while a menu is open.
+        RunLoop.main.add(timer, forMode: .common)
+        frameTimer = timer
+    }
+
+    private func stopFrameTimer() {
+        frameTimer?.invalidate()
+        frameTimer = nil
+    }
+
+    @objc private func frameTick() {
+        renderFrame()
+    }
+
+    private func renderFrame() {
+        let now = Date()
+        let dt = now.timeIntervalSince(lastFrame)
+        lastFrame = now
+
+        let edge = settings.edge
+        let style = settings.lineStyle
+        let resting = CGFloat(settings.thickness)
+        let peak = resting * 2
+
+        let session = engine.session
         let kind = session?.kind ?? .tomato
-        let fraction = session == nil ? 1 : engine.fractionRemaining
+        let remaining = session == nil ? 1 : engine.fractionRemaining(at: now)
+        let length = CGFloat(kind.isBreak ? 1 - remaining : remaining)
         let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1)
+
+        let current = displayedThickness ?? (now < boostUntil ? peak : resting)
+        let hit = hoverHit(edge: edge, length: length, thickness: current)
+        let hovering = updateHover(isNear: hit != nil, now: now)
+
+        // Ease toward the target thickness.
+        let target = hovering || now < boostUntil ? peak : resting
+        var thickness = current + (target - current) * CGFloat(min(1, dt * 6))
+        if abs(target - thickness) < 0.05 { thickness = target }
+        displayedThickness = thickness
 
         for window in windows {
             guard let screen = window.targetScreen else { continue }
-            let frame = Self.stripFrame(on: screen, edge: edge, thickness: thickness)
+            let frame = Self.stripFrame(on: screen, edge: edge, extent: peak * style.spread)
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
-            window.lineView.update(
-                fraction: CGFloat(fraction),
-                color: color,
-                edge: edge,
-                animated: !geometryChanged && engine.state != .idle
-            )
+            window.lineView.render(length: length, thickness: thickness * style.spread, color: color, edge: edge, style: style)
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
         }
+
+        if hovering, session != nil, let hit {
+            hoverLabel.show(text: hoverText(now: now), pointer: NSEvent.mouseLocation, lineRect: hit, edge: edge)
+        } else {
+            hoverLabel.orderOut(nil)
+        }
     }
 
-    static func stripFrame(on screen: NSScreen, edge: LineEdge, thickness: Double) -> NSRect {
+    /// The line's on-screen rect under the pointer (with a small margin), if any.
+    private func hoverHit(edge: LineEdge, length: CGFloat, thickness: CGFloat) -> NSRect? {
+        let mouse = NSEvent.mouseLocation
+        for window in windows where window.isVisible {
+            let band = LineView.bandRect(in: NSRect(origin: .zero, size: window.frame.size), edge: edge, length: length, thickness: thickness)
+            let onScreen = band.offsetBy(dx: window.frame.minX, dy: window.frame.minY)
+            if onScreen.insetBy(dx: -Self.hoverMargin, dy: -Self.hoverMargin).contains(mouse) {
+                return onScreen
+            }
+        }
+        return nil
+    }
+
+    private func updateHover(isNear: Bool, now: Date) -> Bool {
+        guard isNear else {
+            nearSince = nil
+            return false
+        }
+        let since = nearSince ?? now
+        nearSince = since
+        return now.timeIntervalSince(since) >= Self.hoverDelay
+    }
+
+    private func hoverText(now: Date) -> String {
+        let seconds = engine.remaining(at: now)
+        let text = seconds < 60 ? "\(Int(seconds.rounded(.up))) s left" : "\(Int((seconds / 60).rounded(.up))) min left"
+        return engine.isPaused ? text + " · paused" : text
+    }
+
+    /// The strip each window covers. The top line sits just under the menu bar, clear of the notch.
+    static func stripFrame(on screen: NSScreen, edge: LineEdge, extent: CGFloat) -> NSRect {
         let f = screen.frame
-        let t = CGFloat(thickness)
         switch edge {
-        case .top: return NSRect(x: f.minX, y: f.maxY - t, width: f.width, height: t)
-        case .bottom: return NSRect(x: f.minX, y: f.minY, width: f.width, height: t)
-        case .left: return NSRect(x: f.minX, y: f.minY, width: t, height: f.height)
-        case .right: return NSRect(x: f.maxX - t, y: f.minY, width: t, height: f.height)
+        case .top:
+            let menuBar = max(0, f.maxY - screen.visibleFrame.maxY)
+            return NSRect(x: f.minX, y: f.maxY - menuBar - extent, width: f.width, height: extent)
+        case .bottom: return NSRect(x: f.minX, y: f.minY, width: f.width, height: extent)
+        case .left: return NSRect(x: f.minX, y: f.minY, width: extent, height: f.height)
+        case .right: return NSRect(x: f.maxX - extent, y: f.minY, width: extent, height: f.height)
         }
     }
 }
@@ -113,7 +204,7 @@ final class LineWindow: NSWindow {
         contentView = lineView
     }
 
-    // Allow the strip to sit over the menu bar.
+    // Allow the strip to sit over the menu bar area.
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         frameRect
     }
@@ -122,38 +213,122 @@ final class LineWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
-/// Fills its bounds proportionally to the time left: horizontal lines shrink toward the left, vertical ones toward the top.
+/// Draws one band hugging the screen edge. Its length is anchored at the right (horizontal)
+/// or bottom (vertical) end, so the moving end is the left or top.
 final class LineView: NSView {
-    private let bar = CALayer()
+    private let fill = CAGradientLayer()
+    private let endFade = CAGradientLayer()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.addSublayer(bar)
+        layer?.addSublayer(fill)
+        fill.mask = endFade
     }
 
     required init?(coder: NSCoder) {
         nil
     }
 
-    func update(fraction: CGFloat, color: NSColor, edge: LineEdge, animated: Bool) {
+    static func bandRect(in bounds: NSRect, edge: LineEdge, length: CGFloat, thickness: CGFloat) -> NSRect {
+        let w = bounds.width
+        let h = bounds.height
+        let t = min(thickness, edge.isHorizontal ? h : w)
+        switch edge {
+        case .top: return NSRect(x: w * (1 - length), y: h - t, width: w * length, height: t)
+        case .bottom: return NSRect(x: w * (1 - length), y: 0, width: w * length, height: t)
+        case .left: return NSRect(x: 0, y: 0, width: t, height: h * length)
+        case .right: return NSRect(x: w - t, y: 0, width: t, height: h * length)
+        }
+    }
+
+    func render(length: CGFloat, thickness: CGFloat, color: NSColor, edge: LineEdge, style: LineStyle) {
         CATransaction.begin()
-        if animated {
-            CATransaction.setAnimationDuration(TimerEngine.tickInterval)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
-        } else {
-            CATransaction.setDisableActions(true)
+        CATransaction.setDisableActions(true)
+
+        fill.frame = Self.bandRect(in: bounds, edge: edge, length: length, thickness: thickness)
+        endFade.frame = fill.bounds
+
+        // Across the band: full colour at the screen edge, fading inward unless solid.
+        let edgeColor = color.withAlphaComponent(color.alphaComponent * style.edgeAlpha)
+        fill.colors = style == .solid
+            ? [color.cgColor, color.cgColor]
+            : [edgeColor.cgColor, edgeColor.withAlphaComponent(0).cgColor]
+        switch edge {
+        case .top: (fill.startPoint, fill.endPoint) = (CGPoint(x: 0.5, y: 1), CGPoint(x: 0.5, y: 0))
+        case .bottom: (fill.startPoint, fill.endPoint) = (CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1))
+        case .left: (fill.startPoint, fill.endPoint) = (CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 0.5))
+        case .right: (fill.startPoint, fill.endPoint) = (CGPoint(x: 1, y: 0.5), CGPoint(x: 0, y: 0.5))
         }
 
-        let b = bounds
-        if edge.isHorizontal {
-            bar.frame = CGRect(x: 0, y: 0, width: b.width * fraction, height: b.height)
-        } else {
-            let height = b.height * fraction
-            bar.frame = CGRect(x: 0, y: b.height - height, width: b.width, height: height)
+        // Along the band: soften the moving end for feathered and haze.
+        let fullLength = edge.isHorizontal ? bounds.width : bounds.height
+        let lineLength = max(1, fullLength * length)
+        var fadeShare: CGFloat = 0
+        if let fade = style.endFade {
+            fadeShare = min(1, min(fullLength * fade.screenShare, lineLength * fade.lineShare) / lineLength)
         }
-        bar.backgroundColor = color.cgColor
+        let opaque = NSColor.black.cgColor
+        if fadeShare > 0 {
+            endFade.colors = [NSColor.clear.cgColor, opaque, opaque]
+            endFade.locations = [0, NSNumber(value: Double(fadeShare)), 1]
+        } else {
+            endFade.colors = [opaque, opaque]
+            endFade.locations = [0, 1]
+        }
+        if edge.isHorizontal {
+            (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 0.5))
+        } else {
+            (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0.5, y: 1), CGPoint(x: 0.5, y: 0))
+        }
 
         CATransaction.commit()
+    }
+}
+
+/// A tiny "12 min left" tag that follows the pointer while it rests on the line.
+final class HoverLabelWindow: NSPanel {
+    private let field = NSTextField(labelWithString: "")
+
+    convenience init() {
+        self.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = false
+        ignoresMouseEvents = true
+        isReleasedWhenClosed = false
+        level = .screenSaver
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.85).cgColor
+        container.layer?.cornerRadius = 5
+        field.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        field.textColor = .white
+        container.addSubview(field)
+        contentView = container
+    }
+
+    func show(text: String, pointer: NSPoint, lineRect: NSRect, edge: LineEdge) {
+        if field.stringValue != text {
+            field.stringValue = text
+            field.sizeToFit()
+        }
+        field.setFrameOrigin(NSPoint(x: 7, y: 3))
+        let size = NSSize(width: field.frame.width + 14, height: field.frame.height + 6)
+        let gap: CGFloat = 6
+
+        let origin: NSPoint
+        switch edge {
+        case .top: origin = NSPoint(x: pointer.x - size.width / 2, y: lineRect.minY - size.height - gap)
+        case .bottom: origin = NSPoint(x: pointer.x - size.width / 2, y: lineRect.maxY + gap)
+        case .left: origin = NSPoint(x: lineRect.maxX + gap, y: pointer.y - size.height / 2)
+        case .right: origin = NSPoint(x: lineRect.minX - size.width - gap, y: pointer.y - size.height / 2)
+        }
+        setFrame(NSRect(origin: origin, size: size), display: true)
+        if !isVisible {
+            orderFrontRegardless()
+        }
     }
 }
