@@ -20,7 +20,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
-        item.button?.imagePosition = .imageLeading
 
         cancellable = engine.objectWillChange
             .merge(with: settings.objectWillChange)
@@ -33,26 +32,24 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private func refreshButton() {
         guard let button = item.button else { return }
 
-        let symbol: String
-        switch engine.state {
-        case .idle: symbol = "timer"
-        case .running: symbol = "circle.fill"
-        case .paused: symbol = "pause.circle.fill"
-        }
-        let config = NSImage.SymbolConfiguration(pointSize: engine.session == nil ? 14 : 10, weight: .regular)
+        // Keep the same template icon at all times so the item never renders blank;
+        // the line itself carries the red/green colour.
+        let symbol = engine.isPaused ? "pause.circle" : "timer"
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Thakaali Timer")?
             .withSymbolConfiguration(config)
         image?.isTemplate = true
         button.image = image
-        button.contentTintColor = engine.session?.kind.color
 
+        // A plain title picks up the menu bar's text colour; an attributed title without
+        // a colour can draw dark-on-dark.
+        button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         if settings.showTimeInMenuBar, engine.session != nil {
-            button.attributedTitle = NSAttributedString(
-                string: " " + Self.format(engine.remaining),
-                attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)]
-            )
+            button.title = Self.format(engine.remaining)
+            button.imagePosition = .imageLeading
         } else {
-            button.attributedTitle = NSAttributedString(string: "")
+            button.title = ""
+            button.imagePosition = .imageOnly
         }
     }
 
