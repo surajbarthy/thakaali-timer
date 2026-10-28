@@ -12,6 +12,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     /// Set while the menu is opened to ask what to do after a session ends.
     private var pendingFinish: SessionKind?
     private var lastFinished: SessionKind = .tomato
+    /// A session ended and no next step has been picked yet. The menu bar menu keeps offering
+    /// the finish choices, and the icon shows a bell, until one is.
+    private var awaitingNext: SessionKind?
 
     init(engine: TimerEngine, settings: AppSettings, openSettings: @escaping () -> Void) {
         self.engine = engine
@@ -34,10 +37,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     private func refreshButton() {
         guard let button = item.button else { return }
+        if engine.session != nil {
+            awaitingNext = nil
+        }
 
-        // Keep the same template icon at all times so the item never renders blank;
-        // the line itself carries the red/green colour.
-        let symbol = engine.isPaused ? "pause.circle" : "timer"
+        // Keep a template icon at all times so the item never renders blank;
+        // the line itself carries the colour.
+        let symbol = awaitingNext != nil ? "bell" : engine.isPaused ? "pause.circle" : "timer"
         let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Thakaali Timer")?
             .withSymbolConfiguration(config)
@@ -62,6 +68,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func presentFinishMenu(after kind: SessionKind) {
         pendingFinish = kind
         lastFinished = kind
+        awaitingNext = kind
+        refreshButton()
         item.button?.performClick(nil)
     }
 
@@ -72,7 +80,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        if let finished = pendingFinish {
+        if let finished = pendingFinish ?? awaitingNext {
             buildFinishMenu(menu, finished: finished)
             menu.addItem(.separator())
             menu.addItem(makeItem("Settings…", #selector(showSettings), key: ","))
@@ -150,6 +158,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     /// Pops the finish menu up at the corner where the line ran out.
     func popUpFinishMenuAtCorner(after kind: SessionKind) {
         lastFinished = kind
+        awaitingNext = kind
+        refreshButton()
         let menu = NSMenu()
         menu.autoenablesItems = false
         buildFinishMenu(menu, finished: kind)
@@ -204,7 +214,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func startTomato() { engine.startTomato() }
     @objc private func startBreak() { engine.startBreak() }
-    @objc private func stop() { engine.stop() }
+    @objc private func stop() {
+        awaitingNext = nil
+        engine.stop()
+        refreshButton()
+    }
     @objc private func startNextAfterFinish() { engine.start(engine.nextKind(after: lastFinished)) }
     @objc private func extendFive() { engine.extend(lastFinished, minutes: 5) }
     @objc private func extendFifteen() { engine.extend(lastFinished, minutes: 15) }
