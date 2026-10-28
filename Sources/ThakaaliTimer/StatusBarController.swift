@@ -21,7 +21,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         super.init()
 
         let menu = NSMenu()
-        menu.font = AppFont.sans(NSFont.menuFont(ofSize: 0).pointSize)
         menu.delegate = self
         item.menu = menu
 
@@ -147,7 +146,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func popUpFinishMenuAtCorner(after kind: SessionKind) {
         lastFinished = kind
         let menu = NSMenu()
-        menu.font = item.menu?.font
         menu.autoenablesItems = false
         buildFinishMenu(menu, finished: kind)
 
