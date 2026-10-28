@@ -25,13 +25,22 @@ enum MenuBarTracker {
     }
 
     /// Where the top line should hang from on this screen: just under the menu bar while it shows,
-    /// the very top while it's hidden. Falls back to the visible frame if no menu bar shows anywhere,
-    /// in case the window list stops reporting it.
+    /// the top of the screen while it's hidden, but never up beside a notch. Falls back to the
+    /// visible frame if no menu bar shows anywhere, in case the window list stops reporting it.
     static func topEdge(of screen: NSScreen, menuBars: [NSRect]) -> CGFloat {
         let f = screen.frame
         guard !menuBars.isEmpty else { return screen.visibleFrame.maxY }
+        let belowNotch = f.maxY - notchHeight(of: screen)
         let bottoms = menuBars.filter { $0.intersects(f) }.map(\.minY)
-        guard let bottom = bottoms.min() else { return f.maxY }
-        return min(f.maxY, max(f.minY, bottom))
+        guard let bottom = bottoms.min() else { return belowNotch }
+        return min(belowNotch, max(f.minY, bottom))
+    }
+
+    /// Height of the band the camera notch sits in, or 0 on a screen without one.
+    private static func notchHeight(of screen: NSScreen) -> CGFloat {
+        if #available(macOS 12.0, *) {
+            return screen.safeAreaInsets.top
+        }
+        return 0
     }
 }
