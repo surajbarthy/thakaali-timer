@@ -14,11 +14,12 @@ enum SessionKind: Equatable {
         }
     }
 
-    /// Red while focusing, green on a break.
+    /// Vermilion while focusing, green on a break. One fixed pair, since the line can sit
+    /// over light or dark windows whatever the system appearance is.
     var color: NSColor {
         isBreak
-            ? NSColor(srgbRed: 0.36, green: 0.84, blue: 0.62, alpha: 1)
-            : NSColor(srgbRed: 0.93, green: 0.30, blue: 0.33, alpha: 1)
+            ? NSColor(srgbRed: 0x1F / 255.0, green: 0x9D / 255.0, blue: 0x63 / 255.0, alpha: 1) // #1F9D63
+            : NSColor(srgbRed: 0xD9 / 255.0, green: 0x48 / 255.0, blue: 0x0F / 255.0, alpha: 1) // #D9480F
     }
 }
 
