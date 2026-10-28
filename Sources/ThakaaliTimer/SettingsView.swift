@@ -30,7 +30,7 @@ struct SettingsView: View {
                 }
 
                 Text("Thickness is the resting size. The line doubles when a session starts or when you rest the pointer on it. It's shown while this window is open so you can try options out.")
-                    .font(.caption)
+                    .font(.geist(11))
                     .foregroundStyle(.secondary)
             }
 
@@ -49,7 +49,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(mode.title)
                             Text(mode.detail)
-                                .font(.caption)
+                                .font(.geist(11))
                                 .foregroundStyle(.secondary)
                         }
                         .tag(mode)
@@ -62,11 +62,12 @@ struct SettingsView: View {
             Section("Menu bar") {
                 Toggle("Show countdown in menu bar", isOn: $settings.showTimeInMenuBar)
                 Text("Hold ⌥ Option in the menu to pause instead of stop.")
-                    .font(.caption)
+                    .font(.geist(11))
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+        .font(.geist(13))
         .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
     }

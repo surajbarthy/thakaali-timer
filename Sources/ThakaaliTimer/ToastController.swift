@@ -90,7 +90,7 @@ private struct ToastView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.geist(13, weight: .semibold))
             HStack(spacing: 6) {
                 ToastButton(title: primaryTitle, fill: primaryColor, action: onPrimary)
                 ToastButton(title: "+5 min", fill: Color.white.opacity(0.14), action: onExtend)
@@ -116,7 +116,7 @@ private struct ToastButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.geist(12, weight: .medium))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(fill))

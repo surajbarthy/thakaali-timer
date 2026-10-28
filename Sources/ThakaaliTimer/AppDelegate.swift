@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppFont.registerBundledFonts()
         settings = AppSettings()
         engine = TimerEngine(settings: settings)
         overlay = OverlayController(engine: engine, settings: settings)

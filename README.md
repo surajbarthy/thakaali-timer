@@ -13,6 +13,7 @@ Behaviour follows Tomato 2, minus the window, ads, goals and website blocking.
 - Thickness slider for the resting size (default 3 pt). The line doubles when a session starts or when you rest the pointer on it for a moment, and shows a small "12 min left" tag
 - Configurable durations: tomato 25 min, short break 5 min, long break 15 min, long break every 4 tomatoes
 - When a session ends: **Toast in the corner** (default), **Menu from the menu bar**, **Alert**, or **Autostart next**. Hold ⌥ to extend by 15 min instead of 5
+- Uses the Geist typeface (bundled, SIL Open Font License) for the toast, hover tag, countdown, menu and Settings
 - Menu bar item with an optional countdown (off by default); no Dock icon
 - Hold ⌥ Option in the menu to **Pause** instead of Stop
 

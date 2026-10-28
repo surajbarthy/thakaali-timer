@@ -15,6 +15,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/$EXECUTABLE" "$APP/Contents/MacOS/$EXECUTABLE"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"
 
 # Ad-hoc signature so macOS will launch it locally.
 codesign --force --sign - "$APP"

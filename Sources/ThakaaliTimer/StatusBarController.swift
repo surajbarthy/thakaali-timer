@@ -21,6 +21,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         super.init()
 
         let menu = NSMenu()
+        menu.font = AppFont.sans(NSFont.menuFont(ofSize: 0).pointSize)
         menu.delegate = self
         item.menu = menu
 
@@ -46,7 +47,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         // A plain title picks up the menu bar's text colour; an attributed title without
         // a colour can draw dark-on-dark.
-        button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        button.font = AppFont.mono(NSFont.systemFontSize)
         if settings.showTimeInMenuBar, engine.session != nil {
             button.title = Self.format(engine.remaining)
             button.imagePosition = .imageLeading

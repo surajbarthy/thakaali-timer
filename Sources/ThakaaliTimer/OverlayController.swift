@@ -304,7 +304,7 @@ final class HoverLabelWindow: NSPanel {
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.85).cgColor
         container.layer?.cornerRadius = 5
-        field.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        field.font = AppFont.mono(11)
         field.textColor = .white
         container.addSubview(field)
         contentView = container
