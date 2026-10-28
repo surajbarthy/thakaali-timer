@@ -33,7 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func sessionFinished(_ kind: SessionKind) {
-        NSSound(named: "Glass")?.play()
+        if settings.playSound {
+            // A built-in macOS alert sound, played by name rather than bundled.
+            NSSound(named: "Glass")?.play()
+        }
         let next = engine.nextKind(after: kind)
         switch settings.endStyle {
         case .autostart:

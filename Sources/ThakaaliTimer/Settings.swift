@@ -62,6 +62,7 @@ final class AppSettings: ObservableObject {
         static let lineStyle = "lineStyle"
         static let reverseDirection = "reverseDirection"
         static let pulseNearEnd = "pulseNearEnd"
+        static let playSound = "playSound"
         static let focusMinutes = "focusMinutes"
         static let shortBreakMinutes = "shortBreakMinutes"
         static let longBreakMinutes = "longBreakMinutes"
@@ -85,6 +86,7 @@ final class AppSettings: ObservableObject {
     @Published var shortBreakMinutes: Int { didSet { defaults.set(shortBreakMinutes, forKey: Key.shortBreakMinutes) } }
     @Published var longBreakMinutes: Int { didSet { defaults.set(longBreakMinutes, forKey: Key.longBreakMinutes) } }
     @Published var longBreakEvery: Int { didSet { defaults.set(longBreakEvery, forKey: Key.longBreakEvery) } }
+    @Published var playSound: Bool { didSet { defaults.set(playSound, forKey: Key.playSound) } }
     @Published var endStyle: EndStyle { didSet { defaults.set(endStyle.rawValue, forKey: Key.endStyle) } }
     @Published var showTimeInMenuBar: Bool { didSet { defaults.set(showTimeInMenuBar, forKey: Key.showTimeInMenuBar) } }
 
@@ -96,6 +98,7 @@ final class AppSettings: ObservableObject {
             Key.lineStyle: LineStyle.solid.rawValue,
             Key.reverseDirection: false,
             Key.pulseNearEnd: true,
+            Key.playSound: true,
             Key.focusMinutes: 25,
             Key.shortBreakMinutes: 5,
             Key.longBreakMinutes: 15,
@@ -109,6 +112,7 @@ final class AppSettings: ObservableObject {
         lineStyle = LineStyle(rawValue: defaults.string(forKey: Key.lineStyle) ?? "") ?? .solid
         reverseDirection = defaults.bool(forKey: Key.reverseDirection)
         pulseNearEnd = defaults.bool(forKey: Key.pulseNearEnd)
+        playSound = defaults.bool(forKey: Key.playSound)
         focusMinutes = defaults.integer(forKey: Key.focusMinutes)
         shortBreakMinutes = defaults.integer(forKey: Key.shortBreakMinutes)
         longBreakMinutes = defaults.integer(forKey: Key.longBreakMinutes)
