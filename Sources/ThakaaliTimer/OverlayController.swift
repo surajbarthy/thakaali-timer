@@ -254,10 +254,9 @@ final class LineView: NSView {
         endFade.frame = fill.bounds
 
         // Across the band: full colour at the screen edge, fading inward unless solid.
-        let edgeColor = color.withAlphaComponent(color.alphaComponent * style.edgeAlpha)
         fill.colors = style == .solid
             ? [color.cgColor, color.cgColor]
-            : [edgeColor.cgColor, edgeColor.withAlphaComponent(0).cgColor]
+            : [color.cgColor, color.withAlphaComponent(0).cgColor]
         switch edge {
         case .top: (fill.startPoint, fill.endPoint) = (CGPoint(x: 0.5, y: 1), CGPoint(x: 0.5, y: 0))
         case .bottom: (fill.startPoint, fill.endPoint) = (CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1))
@@ -265,7 +264,7 @@ final class LineView: NSView {
         case .right: (fill.startPoint, fill.endPoint) = (CGPoint(x: 1, y: 0.5), CGPoint(x: 0, y: 0.5))
         }
 
-        // Along the band: soften the moving end for feathered and haze.
+        // Along the band: soften the moving end when feathered.
         let fullLength = edge.isHorizontal ? bounds.width : bounds.height
         let lineLength = max(1, fullLength * length)
         var fadeShare: CGFloat = 0

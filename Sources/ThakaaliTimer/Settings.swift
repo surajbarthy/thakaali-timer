@@ -12,43 +12,32 @@ enum LineEdge: String, CaseIterable, Identifiable {
 
 /// How the line is drawn.
 enum LineStyle: String, CaseIterable, Identifiable {
-    case solid, feathered, haze
+    case solid, feathered
 
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
 
     /// How far the drawn band extends inward, as a multiple of the line thickness.
     var spread: CGFloat {
-        switch self {
-        case .solid: return 1
-        case .feathered: return 3
-        case .haze: return 9
-        }
+        self == .feathered ? 3 : 1
     }
-
-    /// Opacity at the screen edge; the band fades to clear inward unless solid.
-    var edgeAlpha: CGFloat { self == .haze ? 0.75 : 1 }
 
     /// Fade at the moving end: the shorter of a share of the screen and a share of the line.
     var endFade: (screenShare: CGFloat, lineShare: CGFloat)? {
-        switch self {
-        case .solid: return nil
-        case .feathered: return (0.14, 0.4)
-        case .haze: return (0.22, 0.6)
-        }
+        self == .feathered ? (0.14, 0.4) : nil
     }
 }
 
 /// What happens when a tomato or break runs out.
 enum EndStyle: String, CaseIterable, Identifiable {
-    case menu, toast, alert, autostart
+    case menu, corner, alert, autostart
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .menu: return "Menu from the menu bar"
-        case .toast: return "Toast in the corner"
+        case .menu: return "Menu from the menu bar icon"
+        case .corner: return "Menu where the line ended"
         case .alert: return "Alert"
         case .autostart: return "Autostart next"
         }
@@ -57,7 +46,7 @@ enum EndStyle: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .menu: return "The app's menu drops open with start, extend and stop."
-        case .toast: return "A small toast appears where the line ended."
+        case .corner: return "The same small menu pops up at the corner where the line ran out."
         case .alert: return "A centred alert interrupts you and asks what to do."
         case .autostart: return "The next session starts automatically."
         }
@@ -108,7 +97,7 @@ final class AppSettings: ObservableObject {
             Key.shortBreakMinutes: 5,
             Key.longBreakMinutes: 15,
             Key.longBreakEvery: 4,
-            Key.endStyle: EndStyle.toast.rawValue,
+            Key.endStyle: EndStyle.corner.rawValue,
             Key.showTimeInMenuBar: false,
         ])
 
@@ -120,7 +109,7 @@ final class AppSettings: ObservableObject {
         shortBreakMinutes = defaults.integer(forKey: Key.shortBreakMinutes)
         longBreakMinutes = defaults.integer(forKey: Key.longBreakMinutes)
         longBreakEvery = defaults.integer(forKey: Key.longBreakEvery)
-        endStyle = EndStyle(rawValue: defaults.string(forKey: Key.endStyle) ?? "") ?? .toast
+        endStyle = EndStyle(rawValue: defaults.string(forKey: Key.endStyle) ?? "") ?? .corner
         showTimeInMenuBar = defaults.bool(forKey: Key.showTimeInMenuBar)
     }
 }

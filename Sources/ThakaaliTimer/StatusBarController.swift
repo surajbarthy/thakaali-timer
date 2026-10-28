@@ -75,6 +75,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         if let finished = pendingFinish {
             buildFinishMenu(menu, finished: finished)
+            menu.addItem(.separator())
+            menu.addItem(makeItem("Settings…", #selector(showSettings), key: ","))
+            menu.addItem(makeItem("Quit Thakaali Timer", #selector(quit), key: "q"))
             return
         }
 
@@ -130,18 +133,53 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(header)
         menu.addItem(.separator())
 
+        // Single-key shortcuts while the menu is open: Return, E (⌥E for 15 min), S.
         let next = engine.nextKind(after: finished)
-        menu.addItem(makeItem("Start \(next.title)", #selector(startNextAfterFinish)))
-        menu.addItem(makeItem("Extend 5 min", #selector(extendFive)))
-        let extendLong = makeItem("Extend 15 min", #selector(extendFifteen))
+        menu.addItem(makeItem("Start \(next.title)", #selector(startNextAfterFinish), key: "\r", modifiers: []))
+        menu.addItem(makeItem("Extend 5 min", #selector(extendFive), key: "e", modifiers: []))
+        let extendLong = makeItem("Extend 15 min", #selector(extendFifteen), key: "e", modifiers: .option)
         extendLong.isAlternate = true
-        extendLong.keyEquivalentModifierMask = .option
         menu.addItem(extendLong)
-        menu.addItem(makeItem("Stop", #selector(stop)))
+        menu.addItem(makeItem("Stop", #selector(stop), key: "s", modifiers: []))
+    }
 
-        menu.addItem(.separator())
-        menu.addItem(makeItem("Settings…", #selector(showSettings), key: ","))
-        menu.addItem(makeItem("Quit Thakaali Timer", #selector(quit), key: "q"))
+    /// Pops the finish menu up at the corner where the line ran out.
+    func popUpFinishMenuAtCorner(after kind: SessionKind) {
+        lastFinished = kind
+        let menu = NSMenu()
+        menu.font = item.menu?.font
+        menu.autoenablesItems = false
+        buildFinishMenu(menu, finished: kind)
+
+        // Take focus so the shortcuts reach the menu, then hand it back afterwards.
+        let wasActive = NSApp.isActive
+        NSApp.activate(ignoringOtherApps: true)
+        menu.popUp(positioning: nil, at: Self.cornerPoint(for: menu.size, settings: settings), in: nil)
+        if !wasActive {
+            NSApp.hide(nil)
+        }
+    }
+
+    /// Top-left point for a menu of the given size, tucked into the corner the line drains toward.
+    private static func cornerPoint(for size: NSSize, settings: AppSettings) -> NSPoint {
+        guard let screen = NSScreen.screens.first else { return .zero }
+        let f = screen.frame
+        let inset = CGFloat(settings.thickness) * 2 * settings.lineStyle.spread
+        let margin: CGFloat = 8
+        let reversed = settings.reverseDirection
+        let leftX = f.minX + margin
+        let rightX = f.maxX - size.width - margin
+        switch settings.edge {
+        case .top:
+            let menuBar = max(0, f.maxY - screen.visibleFrame.maxY)
+            return NSPoint(x: reversed ? leftX : rightX, y: f.maxY - menuBar - inset - margin)
+        case .bottom:
+            return NSPoint(x: reversed ? leftX : rightX, y: f.minY + inset + margin + size.height)
+        case .left:
+            return NSPoint(x: f.minX + inset + margin, y: reversed ? screen.visibleFrame.maxY - margin : f.minY + margin + size.height)
+        case .right:
+            return NSPoint(x: f.maxX - inset - size.width - margin, y: reversed ? screen.visibleFrame.maxY - margin : f.minY + margin + size.height)
+        }
     }
 
     private func statusText() -> String {
@@ -152,8 +190,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         return "\(session.kind.title) · \(Self.format(engine.remaining)) left\(paused) · \(tally)"
     }
 
-    private func makeItem(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
+    private func makeItem(_ title: String, _ action: Selector, key: String = "", modifiers: NSEvent.ModifierFlags = .command) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = modifiers
         item.target = self
         return item
     }
