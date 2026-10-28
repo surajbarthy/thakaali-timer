@@ -14,6 +14,9 @@ final class OverlayController: NSObject {
     /// How long the line stays thick after a session starts.
     static let startBoost: TimeInterval = 2.5
     static let frameInterval: TimeInterval = 1.0 / 30
+    /// The line pulses during the last stretch of a session.
+    static let pulseWindow: TimeInterval = 10
+    static let pulsePeriod: TimeInterval = 1.2
 
     private let engine: TimerEngine
     private let settings: AppSettings
@@ -113,7 +116,7 @@ final class OverlayController: NSObject {
         let kind = session?.kind ?? .tomato
         let remaining = session == nil ? 1 : engine.fractionRemaining(at: now)
         let length = CGFloat(kind.isBreak ? 1 - remaining : remaining)
-        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1)
+        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : pulseAlpha(now: now))
 
         let current = displayedThickness ?? (now < boostUntil ? peak : resting)
         let hit = hoverHit(edge: edge, length: length, thickness: current, reversed: reversed)
@@ -169,8 +172,23 @@ final class OverlayController: NSObject {
 
     private func hoverText(now: Date) -> String {
         let seconds = engine.remaining(at: now)
-        let text = seconds < 60 ? "\(Int(seconds.rounded(.up))) s left" : "\(Int((seconds / 60).rounded(.up))) min left"
+        let text = seconds < 60
+            ? Self.countdown(Int(seconds.rounded(.up)), unit: "sec")
+            : Self.countdown(Int((seconds / 60).rounded(.up)), unit: "min")
         return engine.isPaused ? text + " · paused" : text
+    }
+
+    private static func countdown(_ value: Int, unit: String) -> String {
+        "\(value) \(unit)\(value == 1 ? "" : "s") left"
+    }
+
+    /// In the last few seconds of a running session the line gently pulses.
+    private func pulseAlpha(now: Date) -> CGFloat {
+        guard case .running = engine.state else { return 1 }
+        let seconds = engine.remaining(at: now)
+        guard seconds > 0, seconds <= Self.pulseWindow else { return 1 }
+        let phase = now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.pulsePeriod) / Self.pulsePeriod
+        return CGFloat(0.7 + 0.3 * cos(phase * 2 * .pi))
     }
 
     /// The strip each window covers. The top line sits just under the menu bar, clear of the notch.
