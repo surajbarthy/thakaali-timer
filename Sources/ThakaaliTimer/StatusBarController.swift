@@ -121,6 +121,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         positionItem.submenu = positionMenu
         menu.addItem(positionItem)
 
+        // Same wording as the Settings toggle, as a native checkmark item.
+        let soundItem = makeItem("Play Sound", #selector(toggleSound))
+        soundItem.state = settings.playSound ? .on : .off
+        menu.addItem(soundItem)
+
         menu.addItem(makeItem("Settings…", #selector(showSettings), key: ","))
         menu.addItem(.separator())
         menu.addItem(makeItem("Quit Thakaali Timer", #selector(quit), key: "q"))
@@ -205,6 +210,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func resume() { engine.resume() }
     @objc private func showSettings() { openSettings() }
     @objc private func quit() { NSApp.terminate(nil) }
+
+    @objc private func toggleSound() { settings.playSound.toggle() }
 
     @objc private func setEdge(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let edge = LineEdge(rawValue: raw) else { return }

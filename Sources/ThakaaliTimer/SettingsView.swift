@@ -59,7 +59,7 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
 
-                Toggle("Play a sound", isOn: $settings.playSound)
+                Toggle("Play sound", isOn: $settings.playSound)
             }
 
             Section("Menu bar") {
