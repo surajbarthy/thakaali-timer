@@ -157,31 +157,33 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // Take focus so the shortcuts reach the menu, then hand it back afterwards.
         let wasActive = NSApp.isActive
         NSApp.activate(ignoringOtherApps: true)
-        menu.popUp(positioning: nil, at: Self.cornerPoint(for: menu.size, settings: settings), in: nil)
+        menu.popUp(positioning: nil, at: Self.cornerPoint(for: menu.size, finished: kind, settings: settings), in: nil)
         if !wasActive {
             NSApp.hide(nil)
         }
     }
 
-    /// Top-left point for a menu of the given size, tucked into the corner the line drains toward.
-    private static func cornerPoint(for size: NSSize, settings: AppSettings) -> NSPoint {
+    /// Top-left point for a menu of the given size, tucked into the corner where the line's moving
+    /// end stopped: a tomato drains into its anchored end, a break fills out to the far end.
+    private static func cornerPoint(for size: NSSize, finished kind: SessionKind, settings: AppSettings) -> NSPoint {
         guard let screen = NSScreen.screens.first else { return .zero }
         let f = screen.frame
         let inset = CGFloat(settings.thickness) * 2 * settings.lineStyle.spread
         let margin: CGFloat = 8
-        let reversed = settings.reverseDirection
+        // True when the corner is the left (or top) end of the edge.
+        let atStart = kind.isBreak ? !settings.anchorsAtStart : settings.anchorsAtStart
         let leftX = f.minX + margin
         let rightX = f.maxX - size.width - margin
         switch settings.edge {
         case .top:
             let menuBar = max(0, f.maxY - screen.visibleFrame.maxY)
-            return NSPoint(x: reversed ? leftX : rightX, y: f.maxY - menuBar - inset - margin)
+            return NSPoint(x: atStart ? leftX : rightX, y: f.maxY - menuBar - inset - margin)
         case .bottom:
-            return NSPoint(x: reversed ? leftX : rightX, y: f.minY + inset + margin + size.height)
+            return NSPoint(x: atStart ? leftX : rightX, y: f.minY + inset + margin + size.height)
         case .left:
-            return NSPoint(x: f.minX + inset + margin, y: reversed ? screen.visibleFrame.maxY - margin : f.minY + margin + size.height)
+            return NSPoint(x: f.minX + inset + margin, y: atStart ? screen.visibleFrame.maxY - margin : f.minY + margin + size.height)
         case .right:
-            return NSPoint(x: f.maxX - inset - size.width - margin, y: reversed ? screen.visibleFrame.maxY - margin : f.minY + margin + size.height)
+            return NSPoint(x: f.maxX - inset - size.width - margin, y: atStart ? screen.visibleFrame.maxY - margin : f.minY + margin + size.height)
         }
     }
 

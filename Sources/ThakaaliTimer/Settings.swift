@@ -85,8 +85,11 @@ final class AppSettings: ObservableObject {
     @Published var edge: LineEdge { didSet { defaults.set(edge.rawValue, forKey: Key.edge) } }
     @Published var thickness: Double { didSet { defaults.set(thickness, forKey: Key.thickness) } }
     @Published var lineStyle: LineStyle { didSet { defaults.set(lineStyle.rawValue, forKey: Key.lineStyle) } }
-    /// Anchor the line at the left (or top) instead of the right (or bottom).
+    /// Anchor the line at the right (or bottom) instead of the default left (or top).
     @Published var reverseDirection: Bool { didSet { defaults.set(reverseDirection, forKey: Key.reverseDirection) } }
+
+    /// True when the line is anchored at the left (or top) end of its edge, which is the default.
+    var anchorsAtStart: Bool { !reverseDirection }
     @Published var pulseNearEnd: Bool { didSet { defaults.set(pulseNearEnd, forKey: Key.pulseNearEnd) } }
     @Published var focusMinutes: Int { didSet { defaults.set(focusMinutes, forKey: Key.focusMinutes) } }
     @Published var shortBreakMinutes: Int { didSet { defaults.set(shortBreakMinutes, forKey: Key.shortBreakMinutes) } }
