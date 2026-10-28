@@ -71,6 +71,7 @@ final class AppSettings: ObservableObject {
         static let edge = "lineEdge"
         static let thickness = "restingThickness"
         static let lineStyle = "lineStyle"
+        static let reverseDirection = "reverseDirection"
         static let focusMinutes = "focusMinutes"
         static let shortBreakMinutes = "shortBreakMinutes"
         static let longBreakMinutes = "longBreakMinutes"
@@ -87,6 +88,8 @@ final class AppSettings: ObservableObject {
     @Published var edge: LineEdge { didSet { defaults.set(edge.rawValue, forKey: Key.edge) } }
     @Published var thickness: Double { didSet { defaults.set(thickness, forKey: Key.thickness) } }
     @Published var lineStyle: LineStyle { didSet { defaults.set(lineStyle.rawValue, forKey: Key.lineStyle) } }
+    /// Anchor the line at the left (or top) instead of the right (or bottom).
+    @Published var reverseDirection: Bool { didSet { defaults.set(reverseDirection, forKey: Key.reverseDirection) } }
     @Published var focusMinutes: Int { didSet { defaults.set(focusMinutes, forKey: Key.focusMinutes) } }
     @Published var shortBreakMinutes: Int { didSet { defaults.set(shortBreakMinutes, forKey: Key.shortBreakMinutes) } }
     @Published var longBreakMinutes: Int { didSet { defaults.set(longBreakMinutes, forKey: Key.longBreakMinutes) } }
@@ -100,6 +103,7 @@ final class AppSettings: ObservableObject {
             Key.edge: LineEdge.top.rawValue,
             Key.thickness: 3.0,
             Key.lineStyle: LineStyle.solid.rawValue,
+            Key.reverseDirection: false,
             Key.focusMinutes: 25,
             Key.shortBreakMinutes: 5,
             Key.longBreakMinutes: 15,
@@ -111,6 +115,7 @@ final class AppSettings: ObservableObject {
         edge = LineEdge(rawValue: defaults.string(forKey: Key.edge) ?? "") ?? .top
         thickness = defaults.double(forKey: Key.thickness)
         lineStyle = LineStyle(rawValue: defaults.string(forKey: Key.lineStyle) ?? "") ?? .solid
+        reverseDirection = defaults.bool(forKey: Key.reverseDirection)
         focusMinutes = defaults.integer(forKey: Key.focusMinutes)
         shortBreakMinutes = defaults.integer(forKey: Key.shortBreakMinutes)
         longBreakMinutes = defaults.integer(forKey: Key.longBreakMinutes)

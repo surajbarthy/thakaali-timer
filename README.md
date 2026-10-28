@@ -8,7 +8,7 @@ Behaviour follows Tomato 2, minus the window, ads, goals and website blocking.
 
 - Thin progress line on every display, click-through, and visible over full-screen apps
 - Line position: top (default, just under the menu bar, clear of the notch), bottom, left or right
-- The tomato line drains toward the top-right corner (bottom on the side edges); the break line grows back out of that corner until it is full
+- The tomato line drains toward the top-right corner (bottom on the side edges); the break line grows back out of that corner until it is full. A "Reverse direction" setting anchors it at the left (top on the side edges) instead
 - Line style: **Solid**, **Feathered** (soft edges, faded moving end) or **Haze** (wide, faint wash)
 - Thickness slider for the resting size (default 3 pt). The line doubles when a session starts or when you rest the pointer on it for a moment, and shows a small "12 min left" tag
 - Configurable durations: tomato 25 min, short break 5 min, long break 15 min, long break every 4 tomatoes

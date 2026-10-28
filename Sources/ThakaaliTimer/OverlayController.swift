@@ -5,6 +5,7 @@ import Combine
 ///
 /// The tomato line is anchored at the top-right (bottom on the side edges) and drains toward
 /// that corner; the break line grows back out of the same corner until it is full.
+/// "Reverse direction" anchors at the left (top on the side edges) instead.
 @MainActor
 final class OverlayController: NSObject {
     /// How close the pointer must be to the line, and for how long, before it counts as hovering.
@@ -104,6 +105,7 @@ final class OverlayController: NSObject {
 
         let edge = settings.edge
         let style = settings.lineStyle
+        let reversed = settings.reverseDirection
         let resting = CGFloat(settings.thickness)
         let peak = resting * 2
 
@@ -114,7 +116,7 @@ final class OverlayController: NSObject {
         let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1)
 
         let current = displayedThickness ?? (now < boostUntil ? peak : resting)
-        let hit = hoverHit(edge: edge, length: length, thickness: current)
+        let hit = hoverHit(edge: edge, length: length, thickness: current, reversed: reversed)
         let hovering = updateHover(isNear: hit != nil, now: now)
 
         // Ease toward the target thickness.
@@ -129,7 +131,7 @@ final class OverlayController: NSObject {
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
-            window.lineView.render(length: length, thickness: thickness * style.spread, color: color, edge: edge, style: style)
+            window.lineView.render(length: length, thickness: thickness * style.spread, color: color, edge: edge, style: style, reversed: reversed)
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
@@ -143,10 +145,10 @@ final class OverlayController: NSObject {
     }
 
     /// The line's on-screen rect under the pointer (with a small margin), if any.
-    private func hoverHit(edge: LineEdge, length: CGFloat, thickness: CGFloat) -> NSRect? {
+    private func hoverHit(edge: LineEdge, length: CGFloat, thickness: CGFloat, reversed: Bool) -> NSRect? {
         let mouse = NSEvent.mouseLocation
         for window in windows where window.isVisible {
-            let band = LineView.bandRect(in: NSRect(origin: .zero, size: window.frame.size), edge: edge, length: length, thickness: thickness)
+            let band = LineView.bandRect(in: NSRect(origin: .zero, size: window.frame.size), edge: edge, length: length, thickness: thickness, reversed: reversed)
             let onScreen = band.offsetBy(dx: window.frame.minX, dy: window.frame.minY)
             if onScreen.insetBy(dx: -Self.hoverMargin, dy: -Self.hoverMargin).contains(mouse) {
                 return onScreen
@@ -214,7 +216,7 @@ final class LineWindow: NSWindow {
 }
 
 /// Draws one band hugging the screen edge. Its length is anchored at the right (horizontal)
-/// or bottom (vertical) end, so the moving end is the left or top.
+/// or bottom (vertical) end, so the moving end is the left or top; reversed swaps the ends.
 final class LineView: NSView {
     private let fill = CAGradientLayer()
     private let endFade = CAGradientLayer()
@@ -230,23 +232,25 @@ final class LineView: NSView {
         nil
     }
 
-    static func bandRect(in bounds: NSRect, edge: LineEdge, length: CGFloat, thickness: CGFloat) -> NSRect {
+    static func bandRect(in bounds: NSRect, edge: LineEdge, length: CGFloat, thickness: CGFloat, reversed: Bool) -> NSRect {
         let w = bounds.width
         let h = bounds.height
         let t = min(thickness, edge.isHorizontal ? h : w)
+        let x = reversed ? 0 : w * (1 - length)
+        let y = reversed ? h * (1 - length) : 0
         switch edge {
-        case .top: return NSRect(x: w * (1 - length), y: h - t, width: w * length, height: t)
-        case .bottom: return NSRect(x: w * (1 - length), y: 0, width: w * length, height: t)
-        case .left: return NSRect(x: 0, y: 0, width: t, height: h * length)
-        case .right: return NSRect(x: w - t, y: 0, width: t, height: h * length)
+        case .top: return NSRect(x: x, y: h - t, width: w * length, height: t)
+        case .bottom: return NSRect(x: x, y: 0, width: w * length, height: t)
+        case .left: return NSRect(x: 0, y: y, width: t, height: h * length)
+        case .right: return NSRect(x: w - t, y: y, width: t, height: h * length)
         }
     }
 
-    func render(length: CGFloat, thickness: CGFloat, color: NSColor, edge: LineEdge, style: LineStyle) {
+    func render(length: CGFloat, thickness: CGFloat, color: NSColor, edge: LineEdge, style: LineStyle, reversed: Bool) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        fill.frame = Self.bandRect(in: bounds, edge: edge, length: length, thickness: thickness)
+        fill.frame = Self.bandRect(in: bounds, edge: edge, length: length, thickness: thickness, reversed: reversed)
         endFade.frame = fill.bounds
 
         // Across the band: full colour at the screen edge, fading inward unless solid.
@@ -276,10 +280,12 @@ final class LineView: NSView {
             endFade.colors = [opaque, opaque]
             endFade.locations = [0, 1]
         }
-        if edge.isHorizontal {
-            (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 0.5))
-        } else {
-            (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0.5, y: 1), CGPoint(x: 0.5, y: 0))
+        // The gradient starts (clear) at the moving end.
+        switch (edge.isHorizontal, reversed) {
+        case (true, false): (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 0.5))
+        case (true, true): (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 1, y: 0.5), CGPoint(x: 0, y: 0.5))
+        case (false, false): (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0.5, y: 1), CGPoint(x: 0.5, y: 0))
+        case (false, true): (endFade.startPoint, endFade.endPoint) = (CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1))
         }
 
         CATransaction.commit()

@@ -65,16 +65,20 @@ final class ToastController {
         let f = screen.frame
         let inset = CGFloat(settings.thickness) * 2 * settings.lineStyle.spread
         let margin: CGFloat = 10
+        let reversed = settings.reverseDirection
+        let leftX = f.minX + margin
+        let rightX = f.maxX - size.width - margin
+        let topY = screen.visibleFrame.maxY - size.height - margin
         switch settings.edge {
         case .top:
             let menuBar = max(0, f.maxY - screen.visibleFrame.maxY)
-            return NSPoint(x: f.maxX - size.width - margin, y: f.maxY - menuBar - inset - size.height - margin)
+            return NSPoint(x: reversed ? leftX : rightX, y: f.maxY - menuBar - inset - size.height - margin)
         case .bottom:
-            return NSPoint(x: f.maxX - size.width - margin, y: f.minY + inset + margin)
+            return NSPoint(x: reversed ? leftX : rightX, y: f.minY + inset + margin)
         case .left:
-            return NSPoint(x: f.minX + inset + margin, y: f.minY + margin)
+            return NSPoint(x: f.minX + inset + margin, y: reversed ? topY : f.minY + margin)
         case .right:
-            return NSPoint(x: f.maxX - inset - size.width - margin, y: f.minY + margin)
+            return NSPoint(x: f.maxX - inset - size.width - margin, y: reversed ? topY : f.minY + margin)
         }
     }
 }

@@ -20,6 +20,8 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
+                Toggle("Reverse direction", isOn: $settings.reverseDirection)
+
                 HStack {
                     Slider(value: $settings.thickness, in: AppSettings.thicknessRange, step: 1) {
                         Text("Thickness")
