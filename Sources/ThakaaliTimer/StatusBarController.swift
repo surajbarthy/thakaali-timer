@@ -176,8 +176,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let rightX = f.maxX - size.width - margin
         switch settings.edge {
         case .top:
-            let menuBar = max(0, f.maxY - screen.visibleFrame.maxY)
-            return NSPoint(x: atStart ? leftX : rightX, y: f.maxY - menuBar - inset - margin)
+            let top = MenuBarTracker.topEdge(of: screen, menuBars: MenuBarTracker.menuBarRects())
+            return NSPoint(x: atStart ? leftX : rightX, y: top - inset - margin)
         case .bottom:
             return NSPoint(x: atStart ? leftX : rightX, y: f.minY + inset + margin + size.height)
         case .left:

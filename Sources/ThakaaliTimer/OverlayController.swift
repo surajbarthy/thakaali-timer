@@ -3,9 +3,9 @@ import Combine
 
 /// Draws the progress line along one edge of every display.
 ///
-/// The tomato line is anchored at the top-right (bottom on the side edges) and drains toward
+/// The tomato line is anchored at the top-left (top on the side edges) and drains toward
 /// that corner; the break line grows back out of the same corner until it is full.
-/// "Reverse direction" anchors at the left (top on the side edges) instead.
+/// "Reverse direction" anchors at the right (bottom on the side edges) instead.
 @MainActor
 final class OverlayController: NSObject {
     /// How close the pointer must be to the line, and for how long, before it counts as hovering.
@@ -17,6 +17,8 @@ final class OverlayController: NSObject {
     /// The line pulses during the last stretch of a session.
     static let pulseWindow: TimeInterval = 60
     static let pulsePeriod: TimeInterval = 3
+    /// How often to look up where the menu bar is.
+    static let menuBarPollInterval: TimeInterval = 0.1
 
     private let engine: TimerEngine
     private let settings: AppSettings
@@ -29,6 +31,8 @@ final class OverlayController: NSObject {
     private var lastStartCount = 0
     private var boostUntil = Date.distantPast
     private var nearSince: Date?
+    private var menuBars: [NSRect] = []
+    private var lastMenuBarPoll = Date.distantPast
 
     /// Shows a full line while idle, so style, thickness and position changes can be seen in Settings.
     var previewing = false {
@@ -108,6 +112,10 @@ final class OverlayController: NSObject {
 
         let edge = settings.edge
         let style = settings.lineStyle
+        if edge == .top, now.timeIntervalSince(lastMenuBarPoll) >= Self.menuBarPollInterval {
+            menuBars = MenuBarTracker.menuBarRects()
+            lastMenuBarPoll = now
+        }
         let atStart = settings.anchorsAtStart
         let resting = CGFloat(settings.thickness)
         let peak = resting * 2
@@ -131,7 +139,11 @@ final class OverlayController: NSObject {
 
         for window in windows {
             guard let screen = window.targetScreen else { continue }
-            let frame = Self.stripFrame(on: screen, edge: edge, extent: peak * style.spread)
+            // Follow the menu bar as it hides and slides back, easing between polls.
+            let targetTop = MenuBarTracker.topEdge(of: screen, menuBars: menuBars)
+            let top = window.topEdge.map { $0 + (targetTop - $0) * CGFloat(min(1, dt * 15)) } ?? targetTop
+            window.topEdge = abs(targetTop - top) < 0.5 ? targetTop : top
+            let frame = Self.stripFrame(on: screen, edge: edge, extent: peak * style.spread, top: window.topEdge ?? targetTop)
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
@@ -183,8 +195,8 @@ final class OverlayController: NSObject {
         "\(value) \(unit)\(value == 1 ? "" : "s") left"
     }
 
-    /// 0…1 breathing in the last minute of a running session. The line swells by up to a sixth
-    /// of its resting thickness (about 3 → 3.5 pt) and dims to 90%, in step.
+    /// 0…1 breathing in the last minute of a running session. The line swells (see
+    /// LineStyle.pulseSwell) and dims to 90%, in step.
     private func pulseAmount(now: Date) -> CGFloat {
         guard settings.pulseNearEnd, case .running = engine.state else { return 0 }
         let seconds = engine.remaining(at: now)
@@ -193,13 +205,13 @@ final class OverlayController: NSObject {
         return CGFloat(0.5 - 0.5 * cos(phase * 2 * .pi))
     }
 
-    /// The strip each window covers. The top line sits just under the menu bar, clear of the notch.
-    static func stripFrame(on screen: NSScreen, edge: LineEdge, extent: CGFloat) -> NSRect {
+    /// The strip each window covers. The top line hangs from `top`: just under the menu bar
+    /// (clear of the notch), or the screen's top while the menu bar is hidden.
+    static func stripFrame(on screen: NSScreen, edge: LineEdge, extent: CGFloat, top: CGFloat) -> NSRect {
         let f = screen.frame
         switch edge {
         case .top:
-            let menuBar = max(0, f.maxY - screen.visibleFrame.maxY)
-            return NSRect(x: f.minX, y: f.maxY - menuBar - extent, width: f.width, height: extent)
+            return NSRect(x: f.minX, y: top - extent, width: f.width, height: extent)
         case .bottom: return NSRect(x: f.minX, y: f.minY, width: f.width, height: extent)
         case .left: return NSRect(x: f.minX, y: f.minY, width: extent, height: f.height)
         case .right: return NSRect(x: f.maxX - extent, y: f.minY, width: extent, height: f.height)
@@ -211,6 +223,8 @@ final class OverlayController: NSObject {
 final class LineWindow: NSWindow {
     let lineView = LineView(frame: .zero)
     private(set) weak var targetScreen: NSScreen?
+    /// Where the top line currently hangs from, eased toward the menu bar's position.
+    var topEdge: CGFloat?
 
     convenience init(screen: NSScreen) {
         self.init(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
