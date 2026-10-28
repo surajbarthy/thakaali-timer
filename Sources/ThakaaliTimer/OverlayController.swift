@@ -116,7 +116,7 @@ final class OverlayController: NSObject {
         let kind = session?.kind ?? .tomato
         let remaining = session == nil ? 1 : engine.fractionRemaining(at: now)
         let length = CGFloat(kind.isBreak ? 1 - remaining : remaining)
-        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : pulseAlpha(now: now))
+        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1)
 
         let current = displayedThickness ?? (now < boostUntil ? peak : resting)
         let hit = hoverHit(edge: edge, length: length, thickness: current, reversed: reversed)
@@ -134,7 +134,7 @@ final class OverlayController: NSObject {
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
-            window.lineView.render(length: length, thickness: thickness * style.spread, color: color, edge: edge, style: style, reversed: reversed)
+            window.lineView.render(length: length, thickness: (thickness + pulseSwell(now: now, resting: resting)) * style.spread, color: color, edge: edge, style: style, reversed: reversed)
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
@@ -182,13 +182,14 @@ final class OverlayController: NSObject {
         "\(value) \(unit)\(value == 1 ? "" : "s") left"
     }
 
-    /// In the last few seconds of a running session the line gently pulses.
-    private func pulseAlpha(now: Date) -> CGFloat {
-        guard case .running = engine.state else { return 1 }
+    /// In the last few seconds of a running session the line gently swells, by up to a third
+    /// of its resting thickness (about 3 → 4 pt), and settles back.
+    private func pulseSwell(now: Date, resting: CGFloat) -> CGFloat {
+        guard case .running = engine.state else { return 0 }
         let seconds = engine.remaining(at: now)
-        guard seconds > 0, seconds <= Self.pulseWindow else { return 1 }
+        guard seconds > 0, seconds <= Self.pulseWindow else { return 0 }
         let phase = now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.pulsePeriod) / Self.pulsePeriod
-        return CGFloat(0.9 + 0.1 * cos(phase * 2 * .pi))
+        return resting / 3 * CGFloat(0.5 - 0.5 * cos(phase * 2 * .pi))
     }
 
     /// The strip each window covers. The top line sits just under the menu bar, clear of the notch.
