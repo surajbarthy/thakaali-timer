@@ -23,9 +23,9 @@ enum LineStyle: String, CaseIterable, Identifiable {
     }
 
     /// How much the drawn band grows at the top of a pulse, as a multiple of the resting thickness.
-    /// Solid goes 3 → 4 pt at the default; Feathered's wider band goes 9 → 10.5 pt.
+    /// Solid goes 3 → 5 pt at the default; Feathered's wider band goes 9 → 10.5 pt.
     var pulseSwell: CGFloat {
-        self == .feathered ? 0.5 : 1.0 / 3
+        self == .feathered ? 0.5 : 2.0 / 3
     }
 
     /// Fade at the moving end: the shorter of a share of the screen and a share of the line.
