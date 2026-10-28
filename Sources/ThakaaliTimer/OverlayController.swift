@@ -16,7 +16,7 @@ final class OverlayController: NSObject {
     static let frameInterval: TimeInterval = 1.0 / 30
     /// The line pulses during the last stretch of a session.
     static let pulseWindow: TimeInterval = 10
-    static let pulsePeriod: TimeInterval = 1.2
+    static let pulsePeriod: TimeInterval = 2
 
     private let engine: TimerEngine
     private let settings: AppSettings
@@ -188,7 +188,7 @@ final class OverlayController: NSObject {
         let seconds = engine.remaining(at: now)
         guard seconds > 0, seconds <= Self.pulseWindow else { return 1 }
         let phase = now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.pulsePeriod) / Self.pulsePeriod
-        return CGFloat(0.7 + 0.3 * cos(phase * 2 * .pi))
+        return CGFloat(0.9 + 0.1 * cos(phase * 2 * .pi))
     }
 
     /// The strip each window covers. The top line sits just under the menu bar, clear of the notch.
