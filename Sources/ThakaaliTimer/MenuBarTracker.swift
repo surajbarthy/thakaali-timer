@@ -30,10 +30,15 @@ enum MenuBarTracker {
     static func topEdge(of screen: NSScreen, menuBars: [NSRect]) -> CGFloat {
         let f = screen.frame
         guard !menuBars.isEmpty else { return screen.visibleFrame.maxY }
-        // The safe area's top inset is the notch band, or 0 on a screen without one.
-        let belowNotch = f.maxY - screen.safeAreaInsets.top
+        let belowNotch = ceiling(of: screen)
         let bottoms = menuBars.filter { $0.intersects(f) }.map(\.minY)
         guard let bottom = bottoms.min() else { return belowNotch }
         return min(belowNotch, max(f.minY, bottom))
+    }
+
+    /// The highest the top line may go: the screen's top, or the bottom of the notch band.
+    /// The safe area's top inset is the notch band, or 0 on a screen without one.
+    static func ceiling(of screen: NSScreen) -> CGFloat {
+        screen.frame.maxY - screen.safeAreaInsets.top
     }
 }

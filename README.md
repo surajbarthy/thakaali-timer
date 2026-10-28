@@ -14,7 +14,9 @@ Behaviour follows Tomato 2, minus the window, ads, goals and website blocking.
 - Configurable durations: tomato 25 min, short break 5 min, long break 15 min, long break every 4 tomatoes
 - When a session ends: a native menu **where the line ended** (default) or **from the menu bar icon**, an **Alert**, or **Autostart next**. In the menu, press Return to start the next session, E to extend 5 min (⌥E for 15) or S to stop
 - Uses the Geist typeface (bundled, SIL Open Font License) for the line's hover tag and the menu bar countdown; menus and Settings stay native
-- Menu bar item with an optional countdown (off by default); no Dock icon
+- Menu bar item with an optional countdown (off by default)
+- Shows in the Dock and the ⌘-Tab switcher so ⌘Q quits it; a setting turns that off for a menu-bar-only app
+- On full-screen spaces the top line rises to the screen's top when the menu bar hides and follows it back down, staying below the notch on MacBook screens
 - Hold ⌥ Option in the menu to **Pause** instead of Stop
 
 ## Build and run

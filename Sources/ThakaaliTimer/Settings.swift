@@ -75,6 +75,7 @@ final class AppSettings: ObservableObject {
         static let longBreakEvery = "longBreakEvery"
         static let endStyle = "endStyle"
         static let showTimeInMenuBar = "showCountdownInMenuBar"
+        static let showInDock = "showInDock"
     }
 
     /// Resting thickness; the line grows to twice this when a session starts or you point at it.
@@ -98,6 +99,8 @@ final class AppSettings: ObservableObject {
     @Published var playSound: Bool { didSet { defaults.set(playSound, forKey: Key.playSound) } }
     @Published var endStyle: EndStyle { didSet { defaults.set(endStyle.rawValue, forKey: Key.endStyle) } }
     @Published var showTimeInMenuBar: Bool { didSet { defaults.set(showTimeInMenuBar, forKey: Key.showTimeInMenuBar) } }
+    /// Show a Dock icon and appear in the ⌘-Tab switcher, so ⌘Q quits from there.
+    @Published var showInDock: Bool { didSet { defaults.set(showInDock, forKey: Key.showInDock) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -114,6 +117,7 @@ final class AppSettings: ObservableObject {
             Key.longBreakEvery: 4,
             Key.endStyle: EndStyle.corner.rawValue,
             Key.showTimeInMenuBar: false,
+            Key.showInDock: true,
         ])
 
         edge = LineEdge(rawValue: defaults.string(forKey: Key.edge) ?? "") ?? .top
@@ -128,5 +132,6 @@ final class AppSettings: ObservableObject {
         longBreakEvery = defaults.integer(forKey: Key.longBreakEvery)
         endStyle = EndStyle(rawValue: defaults.string(forKey: Key.endStyle) ?? "") ?? .corner
         showTimeInMenuBar = defaults.bool(forKey: Key.showTimeInMenuBar)
+        showInDock = defaults.bool(forKey: Key.showInDock)
     }
 }

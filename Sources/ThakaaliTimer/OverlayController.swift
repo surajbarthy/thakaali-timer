@@ -13,12 +13,15 @@ final class OverlayController: NSObject {
     static let hoverDelay: TimeInterval = 0.25
     /// How long the line stays thick after a session starts: a quick swell, then back down.
     static let startBoost: TimeInterval = 0.6
-    static let frameInterval: TimeInterval = 1.0 / 30
+    static let frameInterval: TimeInterval = 1.0 / 60
     /// The line pulses during the last stretch of a session.
     static let pulseWindow: TimeInterval = 60
     static let pulsePeriod: TimeInterval = 3
     /// How often to look up where the menu bar is.
-    static let menuBarPollInterval: TimeInterval = 0.1
+    static let menuBarPollInterval: TimeInterval = 1.0 / 30
+    /// Extra room the top strip keeps below the line, so it can slide down with the menu bar
+    /// inside a window that stays put (moving the window itself stutters).
+    static let menuBarRoom: CGFloat = 60
 
     private let engine: TimerEngine
     private let settings: AppSettings
@@ -139,15 +142,17 @@ final class OverlayController: NSObject {
 
         for window in windows {
             guard let screen = window.targetScreen else { continue }
-            // Follow the menu bar as it hides and slides back, easing between polls.
-            let targetTop = MenuBarTracker.topEdge(of: screen, menuBars: menuBars)
-            let top = window.topEdge.map { $0 + (targetTop - $0) * CGFloat(min(1, dt * 15)) } ?? targetTop
-            window.topEdge = abs(targetTop - top) < 0.5 ? targetTop : top
-            let frame = Self.stripFrame(on: screen, edge: edge, extent: peak * style.spread, top: window.topEdge ?? targetTop)
+            // Follow the menu bar as it hides and slides back, easing between polls. The window
+            // stays put and the band moves inside it.
+            let ceiling = MenuBarTracker.ceiling(of: screen)
+            let targetInset = edge == .top ? min(Self.menuBarRoom, ceiling - MenuBarTracker.topEdge(of: screen, menuBars: menuBars)) : 0
+            let inset = window.topInset.map { $0 + (targetInset - $0) * CGFloat(min(1, dt * 18)) } ?? targetInset
+            window.topInset = abs(targetInset - inset) < 0.25 ? targetInset : inset
+            let frame = Self.stripFrame(on: screen, edge: edge, extent: peak * style.spread, ceiling: ceiling)
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
-            window.lineView.render(length: length, thickness: thickness * style.spread + resting * style.pulseSwell * pulse, color: color, edge: edge, style: style, atStart: atStart)
+            window.lineView.render(length: length, thickness: thickness * style.spread + resting * style.pulseSwell * pulse, color: color, edge: edge, style: style, atStart: atStart, topInset: window.topInset ?? 0)
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
@@ -164,7 +169,7 @@ final class OverlayController: NSObject {
     private func hoverHit(edge: LineEdge, length: CGFloat, thickness: CGFloat, atStart: Bool) -> NSRect? {
         let mouse = NSEvent.mouseLocation
         for window in windows where window.isVisible {
-            let band = LineView.bandRect(in: NSRect(origin: .zero, size: window.frame.size), edge: edge, length: length, thickness: thickness, atStart: atStart)
+            let band = LineView.bandRect(in: NSRect(origin: .zero, size: window.frame.size), edge: edge, length: length, thickness: thickness, atStart: atStart, topInset: window.topInset ?? 0)
             let onScreen = band.offsetBy(dx: window.frame.minX, dy: window.frame.minY)
             if onScreen.insetBy(dx: -Self.hoverMargin, dy: -Self.hoverMargin).contains(mouse) {
                 return onScreen
@@ -205,13 +210,14 @@ final class OverlayController: NSObject {
         return CGFloat(0.5 - 0.5 * cos(phase * 2 * .pi))
     }
 
-    /// The strip each window covers. The top line hangs from `top`: just under the menu bar
-    /// (clear of the notch), or the screen's top while the menu bar is hidden.
-    static func stripFrame(on screen: NSScreen, edge: LineEdge, extent: CGFloat, top: CGFloat) -> NSRect {
+    /// The strip each window covers. The top strip runs down from `ceiling` (the screen's top,
+    /// or below the notch) with room for the line to sit under the menu bar when it shows.
+    static func stripFrame(on screen: NSScreen, edge: LineEdge, extent: CGFloat, ceiling: CGFloat) -> NSRect {
         let f = screen.frame
         switch edge {
         case .top:
-            return NSRect(x: f.minX, y: top - extent, width: f.width, height: extent)
+            let height = extent + menuBarRoom
+            return NSRect(x: f.minX, y: ceiling - height, width: f.width, height: height)
         case .bottom: return NSRect(x: f.minX, y: f.minY, width: f.width, height: extent)
         case .left: return NSRect(x: f.minX, y: f.minY, width: extent, height: f.height)
         case .right: return NSRect(x: f.maxX - extent, y: f.minY, width: extent, height: f.height)
@@ -223,8 +229,8 @@ final class OverlayController: NSObject {
 final class LineWindow: NSWindow {
     let lineView = LineView(frame: .zero)
     private(set) weak var targetScreen: NSScreen?
-    /// Where the top line currently hangs from, eased toward the menu bar's position.
-    var topEdge: CGFloat?
+    /// How far below the strip's top the line currently sits, eased toward the menu bar's bottom.
+    var topInset: CGFloat?
 
     convenience init(screen: NSScreen) {
         self.init(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
@@ -266,25 +272,25 @@ final class LineView: NSView {
         nil
     }
 
-    static func bandRect(in bounds: NSRect, edge: LineEdge, length: CGFloat, thickness: CGFloat, atStart: Bool) -> NSRect {
+    static func bandRect(in bounds: NSRect, edge: LineEdge, length: CGFloat, thickness: CGFloat, atStart: Bool, topInset: CGFloat) -> NSRect {
         let w = bounds.width
         let h = bounds.height
         let t = min(thickness, edge.isHorizontal ? h : w)
         let x = atStart ? 0 : w * (1 - length)
         let y = atStart ? h * (1 - length) : 0
         switch edge {
-        case .top: return NSRect(x: x, y: h - t, width: w * length, height: t)
+        case .top: return NSRect(x: x, y: h - topInset - t, width: w * length, height: t)
         case .bottom: return NSRect(x: x, y: 0, width: w * length, height: t)
         case .left: return NSRect(x: 0, y: y, width: t, height: h * length)
         case .right: return NSRect(x: w - t, y: y, width: t, height: h * length)
         }
     }
 
-    func render(length: CGFloat, thickness: CGFloat, color: NSColor, edge: LineEdge, style: LineStyle, atStart: Bool) {
+    func render(length: CGFloat, thickness: CGFloat, color: NSColor, edge: LineEdge, style: LineStyle, atStart: Bool, topInset: CGFloat) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        fill.frame = Self.bandRect(in: bounds, edge: edge, length: length, thickness: thickness, atStart: atStart)
+        fill.frame = Self.bandRect(in: bounds, edge: edge, length: length, thickness: thickness, atStart: atStart, topInset: topInset)
         endFade.frame = fill.bounds
 
         // Across the band: full colour at the screen edge, fading inward unless solid.

@@ -64,6 +64,7 @@ struct SettingsView: View {
 
             Section("Menu bar") {
                 Toggle("Show countdown in menu bar", isOn: $settings.showTimeInMenuBar)
+                Toggle("Show in Dock and app switcher", isOn: $settings.showInDock)
                 Text("Hold ⌥ Option in the menu to pause instead of stop.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
