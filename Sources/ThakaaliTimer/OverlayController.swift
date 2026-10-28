@@ -16,7 +16,7 @@ final class OverlayController: NSObject {
     static let frameInterval: TimeInterval = 1.0 / 30
     /// The line pulses during the last stretch of a session.
     static let pulseWindow: TimeInterval = 60
-    static let pulsePeriod: TimeInterval = 2
+    static let pulsePeriod: TimeInterval = 3
 
     private let engine: TimerEngine
     private let settings: AppSettings
@@ -117,7 +117,7 @@ final class OverlayController: NSObject {
         let kind = session?.kind ?? .tomato
         let remaining = session == nil ? 1 : engine.fractionRemaining(at: now)
         let length = CGFloat(kind.isBreak ? 1 - remaining : remaining)
-        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1 - 0.2 * pulse)
+        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1 - 0.1 * pulse)
 
         let current = displayedThickness ?? (now < boostUntil ? peak : resting)
         let hit = hoverHit(edge: edge, length: length, thickness: current, reversed: reversed)
@@ -135,7 +135,7 @@ final class OverlayController: NSObject {
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
-            window.lineView.render(length: length, thickness: (thickness + resting / 3 * pulse) * style.spread, color: color, edge: edge, style: style, reversed: reversed)
+            window.lineView.render(length: length, thickness: (thickness + resting / 6 * pulse) * style.spread, color: color, edge: edge, style: style, reversed: reversed)
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
@@ -183,8 +183,8 @@ final class OverlayController: NSObject {
         "\(value) \(unit)\(value == 1 ? "" : "s") left"
     }
 
-    /// 0…1 breathing in the last minute of a running session. The line swells by up to a third
-    /// of its resting thickness (about 3 → 4 pt) and dims to 80%, in step.
+    /// 0…1 breathing in the last minute of a running session. The line swells by up to a sixth
+    /// of its resting thickness (about 3 → 3.5 pt) and dims to 90%, in step.
     private func pulseAmount(now: Date) -> CGFloat {
         guard settings.pulseNearEnd, case .running = engine.state else { return 0 }
         let seconds = engine.remaining(at: now)
