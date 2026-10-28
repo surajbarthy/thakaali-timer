@@ -8,8 +8,10 @@ APP_NAME="Thakaali Timer"
 EXECUTABLE="ThakaaliTimer"
 APP="build/${APP_NAME}.app"
 
-swift build -c release
-BIN_DIR="$(swift build -c release --show-bin-path)"
+# One binary for both Apple Silicon and Intel Macs.
+ARCHS=(--arch arm64 --arch x86_64)
+swift build -c release "${ARCHS[@]}"
+BIN_DIR="$(swift build -c release "${ARCHS[@]}" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

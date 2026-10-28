@@ -32,4 +32,6 @@ For quick iteration you can also run `swift run` from the repo root.
 
 To keep it around, drag `build/Thakaali Timer.app` into `/Applications`.
 
-Every push also builds the app on GitHub Actions; the zipped app is attached to each run as an artifact. Because it is only ad-hoc signed, right-click it and choose **Open** the first time.
+Every push also builds the app on GitHub Actions; the zipped app is attached to each run as an artifact.
+
+To share a build, run the **Release** workflow from the Actions tab with a version like `v0.1.0`. It publishes a GitHub Release with a zip that runs on Apple Silicon and Intel Macs, plus install steps. The app is only ad-hoc signed, so the first launch needs **System Settings → Privacy & Security → Open Anyway**.
