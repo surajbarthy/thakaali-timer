@@ -11,8 +11,8 @@ final class OverlayController: NSObject {
     /// How close the pointer must be to the line, and for how long, before it counts as hovering.
     static let hoverMargin: CGFloat = 6
     static let hoverDelay: TimeInterval = 0.25
-    /// How long the line stays thick after a session starts.
-    static let startBoost: TimeInterval = 2.5
+    /// How long the line stays thick after a session starts: a quick swell, then back down.
+    static let startBoost: TimeInterval = 0.6
     static let frameInterval: TimeInterval = 1.0 / 30
     /// The line pulses during the last stretch of a session.
     static let pulseWindow: TimeInterval = 60
@@ -135,7 +135,7 @@ final class OverlayController: NSObject {
             if window.frame != frame {
                 window.setFrame(frame, display: false)
             }
-            window.lineView.render(length: length, thickness: (thickness + resting / 6 * pulse) * style.spread, color: color, edge: edge, style: style, reversed: reversed)
+            window.lineView.render(length: length, thickness: thickness * style.spread + resting * style.pulseSwell * pulse, color: color, edge: edge, style: style, reversed: reversed)
             if !window.isVisible {
                 window.orderFrontRegardless()
             }
