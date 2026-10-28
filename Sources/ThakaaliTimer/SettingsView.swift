@@ -21,6 +21,7 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
 
                 Toggle("Reverse direction", isOn: $settings.reverseDirection)
+                Toggle("Pulse in the last minute", isOn: $settings.pulseNearEnd)
 
                 HStack {
                     Slider(value: $settings.thickness, in: AppSettings.thicknessRange, step: 1) {
