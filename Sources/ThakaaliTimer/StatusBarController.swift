@@ -13,7 +13,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var pendingFinish: SessionKind?
     private var lastFinished: SessionKind = .tomato
     /// A session ended and no next step has been picked yet. The menu bar menu keeps offering
-    /// the finish choices, and the icon shows a bell, until one is.
+    /// the finish choices until one is.
     private var awaitingNext: SessionKind?
 
     init(engine: TimerEngine, settings: AppSettings, openSettings: @escaping () -> Void) {
@@ -41,9 +41,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             awaitingNext = nil
         }
 
-        // Keep a template icon at all times so the item never renders blank;
+        // Keep the same template icon at all times so the item never renders blank;
         // the line itself carries the colour.
-        let symbol = awaitingNext != nil ? "bell" : engine.isPaused ? "pause.circle" : "timer"
+        let symbol = engine.isPaused ? "pause.circle" : "timer"
         let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Thakaali Timer")?
             .withSymbolConfiguration(config)
