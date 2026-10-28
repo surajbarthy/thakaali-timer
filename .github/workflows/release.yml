@@ -1,0 +1,32 @@
+name: Release
+
+# Run from the Actions tab (or the API) with a version like v0.1.0. Builds the app for
+# Apple Silicon and Intel, zips it, and publishes a GitHub Release with the zip attached.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version tag, like v0.1.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        run: scripts/build-app.sh
+      - name: Zip app
+        run: cd build && ditto -c -k --keepParent "Thakaali Timer.app" "ThakaaliTimer-$VERSION.zip"
+      - name: Publish release
+        run: |
+          gh release create "$VERSION" "build/ThakaaliTimer-$VERSION.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Thakaali Timer $VERSION" \
+            --notes-file .github/release-notes.md
