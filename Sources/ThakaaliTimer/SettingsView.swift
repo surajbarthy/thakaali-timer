@@ -37,12 +37,10 @@ struct SettingsView: View {
             }
 
             Section("Durations") {
-                minutesStepper("Tomato", value: $settings.focusMinutes)
-                minutesStepper("Short break", value: $settings.shortBreakMinutes)
-                minutesStepper("Long break", value: $settings.longBreakMinutes)
-                Stepper(value: $settings.longBreakEvery, in: 2...12) {
-                    LabeledContent("Long break every", value: "\(settings.longBreakEvery) tomatoes")
-                }
+                numberField("Tomato", value: $settings.focusMinutes, range: 1...120, unit: "min")
+                numberField("Short break", value: $settings.shortBreakMinutes, range: 1...120, unit: "min")
+                numberField("Long break", value: $settings.longBreakMinutes, range: 1...120, unit: "min")
+                numberField("Long break every", value: $settings.longBreakEvery, range: 2...12, unit: "tomatoes")
             }
 
             Section("When a session ends") {
@@ -73,9 +71,24 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func minutesStepper(_ title: String, value: Binding<Int>) -> some View {
-        Stepper(value: value, in: 1...120) {
-            LabeledContent(title, value: "\(value.wrappedValue) min")
+    /// A typeable number with a stepper beside it, like System Settings. Values are kept in range.
+    private func numberField(_ title: String, value: Binding<Int>, range: ClosedRange<Int>, unit: String) -> some View {
+        let clamped = Binding<Int>(
+            get: { value.wrappedValue },
+            set: { value.wrappedValue = min(max($0, range.lowerBound), range.upperBound) }
+        )
+        return LabeledContent(title) {
+            HStack(spacing: 6) {
+                TextField(title, value: clamped, format: .number)
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 48)
+                Stepper(title, value: clamped, in: range)
+                    .labelsHidden()
+                Text(unit)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 58, alignment: .leading)
+            }
         }
     }
 }
