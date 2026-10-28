@@ -1,0 +1,35 @@
+# Thakaali Timer
+
+A tiny pomodoro timer for macOS. Instead of a window, the timer is a thin line along the edge of your screen: **red** during a tomato (focus session) and **green** during a break. The line starts full and shrinks as time runs out.
+
+Behaviour follows Tomato 2, minus the window, ads, goals and website blocking.
+
+## Features
+
+- Thin progress line on every display, click-through, and visible over full-screen apps
+- Line position: top (default, just under the menu bar, clear of the notch), bottom, left or right
+- The tomato line drains toward the top-left corner (top on the side edges); the break line grows back out of that corner until it is full. A "Reverse direction" setting anchors it at the right (bottom on the side edges) instead
+- Line style: **Solid** or **Feathered** (soft edges, faded moving end)
+- Thickness slider for the resting size (default 3 pt). The line doubles when a session starts or when you rest the pointer on it for a moment, and shows a small "12 min left" tag
+- Configurable durations: tomato 25 min, short break 5 min, long break 15 min, long break every 4 tomatoes
+- When a session ends: a native menu **where the line ended** (default) or **from the menu bar icon**, an **Alert**, or **Autostart next**. In the menu, press Return to start the next session, E to extend 5 min (⌥E for 15) or S to stop
+- Uses the Geist typeface (bundled, SIL Open Font License) for the line's hover tag and the menu bar countdown; menus and Settings stay native
+- Menu bar item with an optional countdown (off by default)
+- Shows in the Dock and the ⌘-Tab switcher so ⌘Q quits it; a setting turns that off for a menu-bar-only app
+- On full-screen spaces the top line rises to the screen's top when the menu bar hides and follows it back down, staying below the notch on MacBook screens
+- Hold ⌥ Option in the menu to **Pause** instead of Stop
+
+## Build and run
+
+Requires macOS 13 or later and the Xcode command line tools (`xcode-select --install`).
+
+```sh
+scripts/build-app.sh
+open "build/Thakaali Timer.app"
+```
+
+For quick iteration you can also run `swift run` from the repo root.
+
+To keep it around, drag `build/Thakaali Timer.app` into `/Applications`.
+
+Every push also builds the app on GitHub Actions; the zipped app is attached to each run as an artifact. Because it is only ad-hoc signed, right-click it and choose **Open** the first time.
