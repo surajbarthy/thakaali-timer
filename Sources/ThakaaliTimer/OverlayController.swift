@@ -31,6 +31,10 @@ final class OverlayController: NSObject {
     private var frameTimer: Timer?
     private var lastFrame = Date()
     private var displayedThickness: CGFloat?
+    /// Eased so the line fades and slides between sessions instead of jumping, for example
+    /// from the full placeholder into an extension.
+    private var displayedColor: NSColor?
+    private var displayedLength: CGFloat?
     private var lastStartCount = 0
     private var boostUntil = Date.distantPast
     private var nearSince: Date?
@@ -67,9 +71,17 @@ final class OverlayController: NSObject {
     }
 
     private func rebuildWindows() {
-        windows.forEach { $0.close() }
-        windows = NSScreen.screens.map { LineWindow(screen: $0) }
+        syncWindows(force: true)
         refresh()
+    }
+
+    /// One window per display, matched by display ID. NSScreen objects get replaced when
+    /// displays change, so windows never hold on to them.
+    private func syncWindows(force: Bool = false) {
+        let ids = NSScreen.screens.map(\.displayID)
+        guard force || ids != windows.map(\.displayID) else { return }
+        windows.forEach { $0.close() }
+        windows = ids.map { LineWindow(displayID: $0) }
     }
 
     func refresh() {
@@ -78,7 +90,8 @@ final class OverlayController: NSObject {
             boostUntil = Date().addingTimeInterval(Self.startBoost)
         }
 
-        if engine.session != nil || previewing {
+        // While a finished session waits for a choice, the next one shows as a full placeholder.
+        if engine.session != nil || engine.awaiting != nil || previewing {
             startFrameTimer()
             renderFrame()
         } else {
@@ -87,6 +100,8 @@ final class OverlayController: NSObject {
             hoverLabel.orderOut(nil)
             nearSince = nil
             displayedThickness = nil
+            displayedColor = nil
+            displayedLength = nil
         }
     }
 
@@ -123,12 +138,21 @@ final class OverlayController: NSObject {
         let resting = CGFloat(settings.thickness)
         let peak = resting * 2
 
+        syncWindows()
         let session = engine.session
         let pulse = pulseAmount(now: now)
-        let kind = session?.kind ?? .tomato
-        let remaining = session == nil ? 1 : engine.fractionRemaining(at: now)
-        let length = CGFloat(kind.isBreak ? 1 - remaining : remaining)
-        let color = kind.color.withAlphaComponent(engine.isPaused ? 0.45 : 1 - 0.1 * pulse)
+        let upNext = engine.awaiting.map { engine.nextKind(after: $0) }
+        let kind = session?.kind ?? upNext ?? .tomato
+        // A tomato drains and a break fills; with no session running the line shows full.
+        let targetLength = session == nil
+            ? 1
+            : CGFloat(kind.isBreak ? 1 - engine.fractionRemaining(at: now) : engine.fractionRemaining(at: now))
+        let ease = CGFloat(min(1, dt * 5))
+        let length = displayedLength.map { $0 + (targetLength - $0) * ease } ?? targetLength
+        displayedLength = abs(targetLength - length) < 0.0005 ? targetLength : length
+        let baseColor = displayedColor.map { $0.blended(withFraction: ease, of: kind.color) ?? kind.color } ?? kind.color
+        displayedColor = baseColor
+        let color = baseColor.withAlphaComponent(engine.isPaused ? 0.45 : 1 - 0.1 * pulse)
 
         let current = displayedThickness ?? (now < boostUntil ? peak : resting)
         let hit = hoverHit(edge: edge, length: length, thickness: current, atStart: atStart)
@@ -158,8 +182,9 @@ final class OverlayController: NSObject {
             }
         }
 
-        if hovering, session != nil, let hit {
-            hoverLabel.show(text: hoverText(now: now), pointer: NSEvent.mouseLocation, lineRect: hit, edge: edge)
+        if hovering, session != nil || upNext != nil, let hit {
+            let text = upNext.map { "\($0.title) up next" } ?? hoverText(now: now)
+            hoverLabel.show(text: text, pointer: NSEvent.mouseLocation, lineRect: hit, edge: edge)
         } else {
             hoverLabel.orderOut(nil)
         }
@@ -228,13 +253,18 @@ final class OverlayController: NSObject {
 /// A borderless, click-through strip that floats above everything, including full-screen apps.
 final class LineWindow: NSWindow {
     let lineView = LineView(frame: .zero)
-    private(set) weak var targetScreen: NSScreen?
+    private(set) var displayID: CGDirectDisplayID = 0
     /// How far below the strip's top the line currently sits, eased toward the menu bar's bottom.
     var topInset: CGFloat?
 
-    convenience init(screen: NSScreen) {
+    /// The display this strip belongs to, looked up fresh each time.
+    var targetScreen: NSScreen? {
+        NSScreen.screens.first { $0.displayID == displayID }
+    }
+
+    convenience init(displayID: CGDirectDisplayID) {
         self.init(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
-        targetScreen = screen
+        self.displayID = displayID
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
@@ -375,5 +405,12 @@ final class HoverLabelWindow: NSPanel {
         if !isVisible {
             orderFrontRegardless()
         }
+    }
+}
+
+extension NSScreen {
+    /// Stable identifier for the physical display, unlike the NSScreen object itself.
+    var displayID: CGDirectDisplayID {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
     }
 }

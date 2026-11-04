@@ -44,6 +44,9 @@ final class TimerEngine: NSObject, ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var now = Date()
     @Published private(set) var completedTomatoes = 0
+    /// The kind that just ran out while no next step has been picked yet. Cleared by
+    /// starting, extending or stopping.
+    @Published private(set) var awaiting: SessionKind?
     /// Bumped whenever a new session (not a resume) begins.
     private(set) var startCount = 0
 
@@ -137,10 +140,12 @@ final class TimerEngine: NSObject, ObservableObject {
     func stop() {
         stopTicker()
         state = .idle
+        awaiting = nil
     }
 
     private func begin(_ session: Session) {
         startCount += 1
+        awaiting = nil
         now = Date()
         state = .running(session, endsAt: now.addingTimeInterval(session.total))
         startTicker()
@@ -163,10 +168,12 @@ final class TimerEngine: NSObject, ObservableObject {
     @objc private func tick() {
         now = Date()
         guard case .running(let session, let endsAt) = state, endsAt <= now else { return }
-        stop()
+        stopTicker()
+        state = .idle
         if session.kind == .tomato && session.countsTowardCycle {
             completedTomatoes += 1
         }
+        awaiting = session.kind
         onSessionFinished?(session.kind)
     }
 }

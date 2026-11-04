@@ -12,9 +12,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     /// Set while the menu is opened to ask what to do after a session ends.
     private var pendingFinish: SessionKind?
     private var lastFinished: SessionKind = .tomato
-    /// A session ended and no next step has been picked yet. The menu bar menu keeps offering
-    /// the finish choices until one is.
-    private var awaitingNext: SessionKind?
 
     init(engine: TimerEngine, settings: AppSettings, openSettings: @escaping () -> Void) {
         self.engine = engine
@@ -37,10 +34,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     private func refreshButton() {
         guard let button = item.button else { return }
-        if engine.session != nil {
-            awaitingNext = nil
-        }
-
         // Keep the same template icon at all times so the item never renders blank;
         // the line itself carries the colour.
         let symbol = engine.isPaused ? "pause.circle" : "timer"
@@ -68,8 +61,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func presentFinishMenu(after kind: SessionKind) {
         pendingFinish = kind
         lastFinished = kind
-        awaitingNext = kind
-        refreshButton()
         item.button?.performClick(nil)
     }
 
@@ -80,7 +71,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        if let finished = pendingFinish ?? awaitingNext {
+        // Until a choice is made the menu keeps offering it, even after the pop-up was dismissed.
+        if let finished = pendingFinish ?? engine.awaiting {
+            lastFinished = finished
             buildFinishMenu(menu, finished: finished)
             menu.addItem(.separator())
             menu.addItem(makeItem("Settings…", #selector(showSettings), key: ","))
@@ -158,25 +151,27 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     /// Pops the finish menu up at the corner where the line ran out.
     func popUpFinishMenuAtCorner(after kind: SessionKind) {
         lastFinished = kind
-        awaitingNext = kind
-        refreshButton()
         let menu = NSMenu()
         menu.autoenablesItems = false
         buildFinishMenu(menu, finished: kind)
 
-        // Take focus so the shortcuts reach the menu, then hand it back afterwards.
-        let wasActive = NSApp.isActive
+        // Take focus so the shortcuts reach the menu, then hand it back to the app you were in.
+        // Hiding this app instead would also hide the line, now that it can have a Dock icon.
+        let previous = NSWorkspace.shared.frontmostApplication
         NSApp.activate(ignoringOtherApps: true)
         menu.popUp(positioning: nil, at: Self.cornerPoint(for: menu.size, finished: kind, settings: settings), in: nil)
-        if !wasActive {
-            NSApp.hide(nil)
+        if let previous, previous != NSRunningApplication.current {
+            previous.activate(options: [])
         }
     }
 
     /// Top-left point for a menu of the given size, tucked into the corner where the line's moving
     /// end stopped: a tomato drains into its anchored end, a break fills out to the far end.
+    /// Uses the display the pointer is on, since that's the one you're looking at.
     private static func cornerPoint(for size: NSSize, finished kind: SessionKind, settings: AppSettings) -> NSPoint {
-        guard let screen = NSScreen.screens.first else { return .zero }
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main ?? NSScreen.screens.first
+        else { return .zero }
         let f = screen.frame
         let inset = CGFloat(settings.thickness) * 2 * settings.lineStyle.spread
         let margin: CGFloat = 8
@@ -214,11 +209,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func startTomato() { engine.startTomato() }
     @objc private func startBreak() { engine.startBreak() }
-    @objc private func stop() {
-        awaitingNext = nil
-        engine.stop()
-        refreshButton()
-    }
+    @objc private func stop() { engine.stop() }
     @objc private func startNextAfterFinish() { engine.start(engine.nextKind(after: lastFinished)) }
     @objc private func extendFive() { engine.extend(lastFinished, minutes: 5) }
     @objc private func extendFifteen() { engine.extend(lastFinished, minutes: 15) }

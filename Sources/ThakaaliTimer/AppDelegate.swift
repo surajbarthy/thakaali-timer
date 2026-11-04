@@ -113,6 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alert.addButton(withTitle: "Stop")
 
         NSApp.activate(ignoringOtherApps: true)
+        // macOS can refuse to bring a background app forward, so float the alert above other
+        // apps rather than leave it hidden behind them.
+        alert.window.level = .modalPanel
+        alert.window.collectionBehavior.formUnion([.canJoinAllSpaces, .fullScreenAuxiliary])
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             engine.start(next)
@@ -120,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let minutes = NSEvent.modifierFlags.contains(.option) ? 15 : 5
             engine.extend(kind, minutes: minutes)
         default:
-            break
+            engine.stop()
         }
     }
 
