@@ -38,6 +38,8 @@ final class OverlayController: NSObject {
     private var lastStartCount = 0
     private var boostUntil = Date.distantPast
     private var nearSince: Date?
+    /// The line rect last under the pointer, kept while the pointer moves onto the start button.
+    private var lastHit: NSRect?
     private var menuBars: [NSRect] = []
     private var lastMenuBarPoll = Date.distantPast
 
@@ -55,6 +57,12 @@ final class OverlayController: NSObject {
             .merge(with: settings.objectWillChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refresh() }
+
+        // While the next session waits, the hover tag is a button that starts it.
+        hoverLabel.onClick = { [weak self] in
+            guard let self, let finished = self.engine.awaiting else { return }
+            self.engine.start(self.engine.nextKind(after: finished))
+        }
 
         NotificationCenter.default.addObserver(
             self,
@@ -155,7 +163,11 @@ final class OverlayController: NSObject {
         let color = baseColor.withAlphaComponent(engine.isPaused ? 0.45 : 1 - 0.1 * pulse)
 
         let current = displayedThickness ?? (now < boostUntil ? peak : resting)
-        let hit = hoverHit(edge: edge, length: length, thickness: current, atStart: atStart)
+        // Moving from the line onto the start button keeps the hover alive.
+        let onButton = upNext != nil && hoverLabel.isVisible
+            && hoverLabel.frame.insetBy(dx: -Self.hoverMargin, dy: -Self.hoverMargin).contains(NSEvent.mouseLocation)
+        let hit = hoverHit(edge: edge, length: length, thickness: current, atStart: atStart) ?? (onButton ? lastHit : nil)
+        lastHit = hit
         let hovering = updateHover(isNear: hit != nil, now: now)
 
         // Ease toward the target thickness.
@@ -183,8 +195,8 @@ final class OverlayController: NSObject {
         }
 
         if hovering, session != nil || upNext != nil, let hit {
-            let text = upNext.map { "\($0.title) up next" } ?? hoverText(now: now)
-            hoverLabel.show(text: text, pointer: NSEvent.mouseLocation, lineRect: hit, edge: edge)
+            let text = upNext.map { "Start \($0.title.lowercased())" } ?? hoverText(now: now)
+            hoverLabel.show(text: text, pointer: NSEvent.mouseLocation, lineRect: hit, edge: edge, clickable: upNext != nil)
         } else {
             hoverLabel.orderOut(nil)
         }
@@ -364,6 +376,9 @@ final class LineView: NSView {
 /// A tiny "12 min left" tag that follows the pointer while it rests on the line.
 final class HoverLabelWindow: NSPanel {
     private let field = NSTextField(labelWithString: "")
+    /// Called when the tag is clicked while it's shown as a button.
+    var onClick: (() -> Void)?
+    private var clickable = false
 
     convenience init() {
         self.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -375,7 +390,12 @@ final class HoverLabelWindow: NSPanel {
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
 
-        let container = NSView()
+        let container = ClickView()
+        container.onClick = { [weak self] in
+            guard let self, self.clickable else { return }
+            self.orderOut(nil)
+            self.onClick?()
+        }
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.85).cgColor
         container.layer?.cornerRadius = 5
@@ -385,7 +405,13 @@ final class HoverLabelWindow: NSPanel {
         contentView = container
     }
 
-    func show(text: String, pointer: NSPoint, lineRect: NSRect, edge: LineEdge) {
+    /// A clickable tag stays where it first appeared, so the pointer can move onto it;
+    /// a plain one follows the pointer and lets clicks through.
+    func show(text: String, pointer: NSPoint, lineRect: NSRect, edge: LineEdge, clickable: Bool) {
+        let staysPut = clickable && self.clickable && isVisible
+        self.clickable = clickable
+        ignoresMouseEvents = !clickable
+        if staysPut, field.stringValue == text { return }
         if field.stringValue != text {
             field.stringValue = text
             field.sizeToFit()
@@ -405,6 +431,21 @@ final class HoverLabelWindow: NSPanel {
         if !isVisible {
             orderFrontRegardless()
         }
+    }
+}
+
+/// Content view that reports clicks; the panel never becomes key, so a plain mouseDown is enough.
+private final class ClickView: NSView {
+    var onClick: (() -> Void)?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        onClick?()
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .pointingHand)
     }
 }
 

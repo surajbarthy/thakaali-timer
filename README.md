@@ -12,7 +12,7 @@ Behaviour follows Tomato 2, minus the window, ads, goals and website blocking.
 - Line style: **Solid** or **Feathered** (soft edges, faded moving end)
 - Thickness slider for the resting size (default 3 pt). The line doubles when a session starts or when you rest the pointer on it for a moment, and shows a small "12 min left" tag
 - Configurable durations: tomato 25 min, short break 5 min, long break 15 min, long break every 4 tomatoes
-- When a session ends: a native menu **where the line ended** (default) or **from the menu bar icon**, an **Alert**, or **Autostart next**. In the menu, press Return to start the next session, E to extend 5 min (⌥E for 15) or S to stop. Until you choose, the next session shows as a full line in its colour, and the menu bar menu keeps the same choices; extending fades the line into the extended session
+- When a session ends: a native menu **where the line ended** (default) or **from the menu bar icon**, an **Alert**, or **Autostart next**. In the menu, press Return to start the next session, E to extend 5 min (⌥E for 15) or S to stop. Until you choose, the next session shows as a full line in its colour, and the menu bar menu keeps the same choices; pointing at that line shows a "Start short break" (or tomato) button, and extending fades the line into the extended session
 - Uses the Geist typeface (bundled, SIL Open Font License) for the line's hover tag and the menu bar countdown; menus and Settings stay native
 - Menu bar item with an optional countdown (off by default)
 - Shows in the Dock and the ⌘-Tab switcher so ⌘Q quits it; a setting turns that off for a menu-bar-only app
